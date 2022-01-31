@@ -222,24 +222,27 @@ def main():
     25. Candidate Division SR1 and Gracilibacteria Code 
         """, type=str, default='1')
     args = parser.parse_args()
-    print("MitoHifi v2.2" + "/n")
-    print("Started at:" , today)
     
-    # measure the length of the related mitogenome 
+    # Welcome message
+    logging.info("MitoHifi v2.2")
+    logging.info(f"Started at: {today}")
+    
+    # Measure the length of the related mitogenome 
     rel_mito_len = getMitoLength.get_mito_length(args.f)
     rel_mito_num_genes = getMitoLength.get_mito_genes(args.g)
-    print("Length of related mitogenome is: {} bp".format(rel_mito_len))
-    print("Number of genes on related mitogenome: {}".format(rel_mito_num_genes))
-    # calculate maximum contig size accepted by mitofinder when annotating the contigs
+    logging.info("Length of related mitogenome is: {} bp".format(rel_mito_len))
+    logging.info("Number of genes on related mitogenome: {}".format(rel_mito_num_genes))
+    
+    # Calculate maximum contig size accepted by mitofinder when annotating the contigs
     max_contig_size = 5*rel_mito_len
 
-    # if input are reads, map them to the related mitogenome and assemble the mapped ones
+    # If input are reads, map them to the related mitogenome and assemble the mapped ones
     if args.r:
-        print("\nRunning MitoHifi pipeline in reads mode\n")
+        logging.info("\nRunning MitoHifi pipeline in reads mode\n")
        
-        print("\nFirst we map your PacbioHiFi reads to the close-related mitogenome\n")
+        logging.info("\nFirst we map your PacbioHiFi reads to the close-related mitogenome\n")
 
-        print(shlex.split(args.r))
+        #print(shlex.split(args.r))
         minimap_cmd = ["minimap2", "-t", str(args.t), "--secondary=no", "-ax", "map-pb", args.f] + shlex.split(args.r) 
         samtools_cmd = ["samtools", "view", "-@", str(args.t), "-S", "-b", "-F4", "-F", "0x800"] 
         minimap = subprocess.Popen(minimap_cmd, stdout=subprocess.PIPE)
@@ -248,13 +251,13 @@ def main():
         minimap.wait()
         minimap.stdout.close()
 
-        print("\nNow we filter out any mapped reads that are larger than the reference mitogenome to avoid NUMTS\n")
+        logging.info("\nNow we filter out any mapped reads that are larger than the reference mitogenome to avoid NUMTS\n")
         mapped_fasta_f = open("gbk.HiFiMapped.bam.fasta", "w")
         subprocess.run(["samtools", "fasta", "reads.HiFiMapped.bam"], stdout=mapped_fasta_f)
 
         filterfasta.filterFasta(minLength=rel_mito_len, neg=True, inStream="gbk.HiFiMapped.bam.fasta", outPath="gbk.HiFiMapped.bam.filtered.fasta")
 
-        print("\nNow let's run hifiasm to assemble the mapped and filtered reads!\n")
+        logging.info("\nNow let's run hifiasm to assemble the mapped and filtered reads!\n")
         
         with open("hifiasm.log", "w") as hifiasm_log_f:
             subprocess.run(["hifiasm", "-t", str(args.t), "-f", str(args.m), "-o", "gbk.HiFiMapped.bam.filtered.assembled", "gbk.HiFiMapped.bam.filtered.fasta", ], stderr=subprocess.STDOUT, stdout=hifiasm_log_f)
@@ -272,9 +275,9 @@ def main():
         contigs = "hifiasm.contigs.fasta"
     
     else:
-        print("\nRunning MitoHifi pipeline in contigs mode\n")
+        logging.info("\nRunning MitoHifi pipeline in contigs mode\n")
        
-        print ("Fixing potentially conflicting FASTA headers...\n")
+        logging.info("Fixing potentially conflicting FASTA headers...\n")
         original_contigs = args.c
         fixContigHeaders.fix_headers(original_contigs, "fixed_header_contigs.fasta")
         
@@ -284,14 +287,14 @@ def main():
         contigs = original_contigs
         
     
-    print("\nLet's run the blast of the contigs versus the close-related mitogenome\n")
+    logging.info("\nLet's run the blast of the contigs versus the close-related mitogenome\n")
 
     makeblastdb = "makeblastdb -in " + args.f + " -dbtype nucl"
-    print(makeblastdb)
+    logging.debug(makeblastdb)
     subprocess.run(["makeblastdb", "-in", args.f, "-dbtype", "nucl"], stderr=subprocess.STDOUT)
-    print("\nmakeblastdb done. Running blast with the contigs\n")
+    logging.debug("\nmakeblastdb done. Running blast with the contigs\n")
     subprocess.run(["blastn", "-query", contigs, "-db", args.f, "-num_threads", str(args.t), "-out", "contigs.blastn", "-outfmt", "6 std qlen slen"], stderr=subprocess.STDOUT)
-    print("Blast done!" + "\n")
+    logging.debug("Blast done!" + "\n")
 
     #the next script parses a series of conditions to exclude blast with NUMTs. 
     if args.a == "plant":
@@ -328,7 +331,7 @@ def main():
     except OSError:
         pass
       
-    print("\n" + "6-) Now we are going to circularize, annotate and rotate each contig which is a potential mitogenome" + "\n")
+    logging.info("\n" + "6-) Now we are going to circularize, annotate and rotate each contig which is a potential mitogenome" + "\n")
     
     # creates a dictionary that will save frameshifts information for each contig
     contig_shifts = {}
@@ -342,7 +345,7 @@ def main():
         executor.map(partial_process_contig, contigs_ids)
     
     tRNA_ref = get_most_freq_tRNA() 
-    print(f"tRNA_ref: {tRNA_ref}") #debug 
+    logging.debug(f"tRNA_ref: {tRNA_ref}") #debug 
     
     
     partial_process_contig_02 = functools.partial(process_contig_02, tRNA_ref, threads_per_contig, args.circular_size, args.circular_offset, contigs, max_contig_size, args.g, args.o)
@@ -355,7 +358,7 @@ def main():
     for curr_file in os.listdir('.'):
         if curr_file.endswith('.circularisationCheck.txt'):
             circularization_history_files.append(curr_file)
-    print(f"circularization_history_files: {circularization_history_files}") # for debugging
+    logging.debug(f"circularization_history_files: {circularization_history_files}") # for debugging
     with open("all_contigs.circularisationCheck.txt", "a") as outfile:
         for circ_hist_file in circularization_history_files:
             contig_id = circ_hist_file.split('.')[0]
@@ -363,9 +366,9 @@ def main():
                 for line in infile:
                     outfile.write("\t".join([contig_id, line.strip()+"\n"]))
     
-    print(f"contig_shifts after parallel processing: {contig_shifts}") # for debugging 
+    logging.debug(f"contig_shifts after parallel processing: {contig_shifts}") # for debugging 
     #align final mitogenome rotated contigs
-    print("\n" + "7-) Now the final rotated contigs will be aligned" + "\n")
+    logging.info("\n" + "7-) Now the final rotated contigs will be aligned" + "\n")
     # list all final rotated contigs 
     contigs_files = []
     for curr_file in os.listdir('.'):
@@ -377,9 +380,9 @@ def main():
     # then run MAFFT alignment between the rotated contigs using the multifasta as input and clustal as output format
     alignContigs.mafft_align(multifasta_file=concat_fasta, threads=args.t, clustal_format=True)
   
-    print("\n" + "8-) Now we will choose the most representative contig" + "\n")
+    logging.info("\n" + "8-) Now we will choose the most representative contig" + "\n")
     repr_contig_id, repr_contig_cluster = getReprContig.get_repr_contig("all_mitogenomes.rotated.fa", args.t)
-    print("Representative contig is {} that belongs to {}. This contig will be our final mitogenome. See all contigs and clusters in cdhit.out.clstr".format(repr_contig_id, repr_contig_cluster))
+    logging.info("Representative contig is {} that belongs to {}. This contig will be our final mitogenome. See all contigs and clusters in cdhit.out.clstr".format(repr_contig_id, repr_contig_cluster))
     
     repr_contig_fasta = repr_contig_id + ".mitogenome.rotated.fa"
     repr_contig_get_gb = ["mitofinder", "--new-genes", "--max-contig-size", str(max_contig_size), "-j", "final_mitogenome.annotation", "-a", repr_contig_fasta, "-r", args.g, "-o", args.o, "-p", str(args.p)]
@@ -413,30 +416,12 @@ def main():
             # same as the final_mitogenome
             if curr_file.split('.')[0] != repr_contig_id: 
                 contigs_stats_files.append(curr_file)
-    print(f"contigs_stats_files: {contigs_stats_files}") # for debugging
+    logging.debug(f"contigs_stats_files: {contigs_stats_files}") # for debugging
     
     with open("contigs_stats.tsv", "a") as outfile:
         for contig_stats in contigs_stats_files:
             with open(contig_stats, "r") as infile:
                 shutil.copyfileobj(infile, outfile)
-
-    #for contig_id in contig_shifts:
-    #    # if contig is the representative, skip writing the stats
-    #    # because we have already written it (final_mitogenome)
-    #    if contig_id == repr_contig_id:
-    #        continue 
-    #    frameshifts = contig_shifts[contig_id][0]
-    #    genbank_path = contig_shifts[contig_id][1]
-    #    contig_len = contig_shifts[contig_id][2]
-    #    num_genes = contig_shifts[contig_id][3]
-    #    if not frameshifts:
-    #        all_frameshifts = "No frameshift found"
-    #    elif len(frameshifts)==1:
-    #        all_frameshifts = "".join(frameshifts)
-    #    elif len(frameshifts)>1:
-    #        all_frameshifts = ";".join(frameshifts)
-    #    with open("contigs_stats.tsv", "a+") as f:
-    #        f.write("\t".join([contig_id, all_frameshifts, genbank_path, contig_len, num_genes+"\n"]))
 
     # copying final FASTA and GBK to working directory
     shutil.copy(final_fasta, "final_mitogenome.fasta")
@@ -445,8 +430,7 @@ def main():
     # cleaning up working directory 
     cleanUpCWD.clean_up_work_dir(contigs_ids)
 
-    print("Pipeline finished!" )
-
+    logging.info("Pipeline finished!" )
 
 if __name__ == '__main__':
     main()
