@@ -227,10 +227,12 @@ def main():
     FORMAT='[%(asctime)s %(levelname)s] %(message)s'
 
     if args.d:
-        logging.basicConfig(level=logging.DEBUG, format=FORMAT, datefmt='%Y-%m-%d %H:%M:%S')
+        logging.basicConfig(level=logging.DEBUG, stream=sys.stdout,
+                            format=FORMAT, datefmt='%Y-%m-%d %H:%M:%S')
     else:
-        logging.basicConfig(level=logging.INFO, format=FORMAT, datefmt='%Y-%m-%d %H:%M:%S')
-
+        logging.basicConfig(level=logging.INFO, stream=sys.stdout,
+                            format=FORMAT, datefmt='%Y-%m-%d %H:%M:%S')
+    
     # Welcome message
     logging.info("Welcome to MitoHifi v2. Starting pipeline...")
     logging.debug("Running MitoHiFi on debug mode.")
@@ -253,7 +255,7 @@ def main():
         #print(shlex.split(args.r))
         minimap_cmd = ["minimap2", "-t", str(args.t), "--secondary=no", "-ax", "map-pb", args.f] + shlex.split(args.r) 
         samtools_cmd = ["samtools", "view", "-@", str(args.t), "-S", "-b", "-F4", "-F", "0x800"] 
-        minimap = subprocess.Popen(minimap_cmd, stdout=subprocess.PIPE)
+        minimap = subprocess.Popen(minimap_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         mapped_reads_f = open("reads.HiFiMapped.bam", "w")
         subprocess.run(samtools_cmd, stderr=subprocess.STDOUT, stdin=minimap.stdout, stdout=mapped_reads_f)
         minimap.wait()
@@ -378,7 +380,7 @@ The pipeline has stopped !! You need to run further scripts to check if you have
     
     logging.debug(f"contig_shifts after parallel processing: {contig_shifts}") # for debugging 
     #align final mitogenome rotated contigs
-    logging.info("\n" + "7-) Now the final rotated contigs will be aligned" + "\n")
+    logging.info("Now the final rotated contigs will be aligned")
     # list all final rotated contigs 
     contigs_files = []
     for curr_file in os.listdir('.'):
