@@ -195,7 +195,9 @@ def process_contig_02(ref_tRNA, threads_per_contig, circular_size, circular_offs
 
 def main():
     
-    logging.basicConfig(level=logging.INFO)
+    # Set log message format
+    FORMAT='%(asctime)s %(levelname)s: %(message)s'
+    logging.basicConfig(level=logging.INFO, format=FORMAT, datefmt='%Y-%m-%d %H:%M:%S')
 
     today = date.today()
 
