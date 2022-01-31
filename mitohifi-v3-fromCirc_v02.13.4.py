@@ -3,10 +3,10 @@ from concurrent.futures import wait
 import logging
 import shutil
 import subprocess
+import time
 import warnings
 import pandas as pd
 import argparse
-from datetime import date
 import parse_blast
 from Bio import SeqIO
 import sys
@@ -48,7 +48,7 @@ def get_circo_mito(contig_id, circular_size, circular_offset):
     args:
     the ID from the contig that we want to circularize
     """
-    print("Defining cut_coords function...\n") # for debugging
+    logging.debug("Defining cut_coords function...\n") # for debugging
     def cut_coords(contig_fasta, circularization_position, fasta_out):
         print(f"cut_coords function called!\ncontig_fasta: {contig_fasta}; circularization_position: {circularization_position}; fasta_out: {fasta_out}") # for debugging
         record=SeqIO.read(contig_fasta, "fasta")
@@ -195,11 +195,7 @@ def process_contig_02(ref_tRNA, threads_per_contig, circular_size, circular_offs
 
 def main():
     
-    # Set log message format
-    FORMAT='%(asctime)s %(levelname)s: %(message)s'
-    logging.basicConfig(level=logging.INFO, format=FORMAT, datefmt='%Y-%m-%d %H:%M:%S')
-
-    today = date.today()
+    start_time = time.time()
 
     parser= argparse.ArgumentParser(add_help=False)
     mutually_exclusive_group = parser.add_mutually_exclusive_group(required=True)
@@ -207,6 +203,7 @@ def main():
     mutually_exclusive_group.add_argument("-c", help= "-c: Assemnbled fasta contigs/scaffolds to be searched to find mitogenome")
     parser.add_argument("-h", "--help", action="help", default=argparse.SUPPRESS, help= "Print this help message.")
     parser.add_argument("-f", help= "-f: Close-related Mitogenome is fasta format", required = "True")
+    parser.add_argument("-d", help="-d: debug mode to output additional info on log", default=False)
     parser.add_argument("-g", help= "-k: Close-related species Mitogenome in genebank format", required = "True")
     parser.add_argument("-a", help="-a: Choose between animal (default) or plant", default="animal", choices=["animal", "plant"])
     parser.add_argument("-t", help= "-t: Number of threads for (i) hifiasm and (ii) the blast search", required = "True", type=int)
@@ -225,9 +222,18 @@ def main():
         """, type=str, default='1')
     args = parser.parse_args()
     
+
+    # Set log message format
+    FORMAT='[%(asctime)s %(levelname)s] %(message)s'
+
+    if args.d:
+        logging.basicConfig(level=logging.DEBUG, format=FORMAT, datefmt='%Y-%m-%d %H:%M:%S')
+    else:
+        logging.basicConfig(level=logging.INFO, format=FORMAT, datefmt='%Y-%m-%d %H:%M:%S')
+
     # Welcome message
-    logging.info("MitoHifi v2.2")
-    logging.info(f"Started at: {today}")
+    logging.info("Welcome to MitoHifi v2. Starting pipeline...")
+    logging.debug("Running MitoHiFi on debug mode.")
     
     # Measure the length of the related mitogenome 
     rel_mito_len = getMitoLength.get_mito_length(args.f)
@@ -240,9 +246,9 @@ def main():
 
     # If input are reads, map them to the related mitogenome and assemble the mapped ones
     if args.r:
-        logging.info("\nRunning MitoHifi pipeline in reads mode\n")
+        logging.info("Running MitoHifi pipeline in reads mode\n")
        
-        logging.info("\nFirst we map your PacbioHiFi reads to the close-related mitogenome\n")
+        logging.info("First we map your PacbioHiFi reads to the close-related mitogenome")
 
         #print(shlex.split(args.r))
         minimap_cmd = ["minimap2", "-t", str(args.t), "--secondary=no", "-ax", "map-pb", args.f] + shlex.split(args.r) 
@@ -253,13 +259,13 @@ def main():
         minimap.wait()
         minimap.stdout.close()
 
-        logging.info("\nNow we filter out any mapped reads that are larger than the reference mitogenome to avoid NUMTS\n")
+        logging.info("Now we filter out any mapped reads that are larger than the reference mitogenome to avoid NUMTS")
         mapped_fasta_f = open("gbk.HiFiMapped.bam.fasta", "w")
         subprocess.run(["samtools", "fasta", "reads.HiFiMapped.bam"], stdout=mapped_fasta_f)
 
         filterfasta.filterFasta(minLength=rel_mito_len, neg=True, inStream="gbk.HiFiMapped.bam.fasta", outPath="gbk.HiFiMapped.bam.filtered.fasta")
 
-        logging.info("\nNow let's run hifiasm to assemble the mapped and filtered reads!\n")
+        logging.info("Now let's run hifiasm to assemble the mapped and filtered reads!")
         
         with open("hifiasm.log", "w") as hifiasm_log_f:
             subprocess.run(["hifiasm", "-t", str(args.t), "-f", str(args.m), "-o", "gbk.HiFiMapped.bam.filtered.assembled", "gbk.HiFiMapped.bam.filtered.fasta", ], stderr=subprocess.STDOUT, stdout=hifiasm_log_f)
@@ -277,9 +283,9 @@ def main():
         contigs = "hifiasm.contigs.fasta"
     
     else:
-        logging.info("\nRunning MitoHifi pipeline in contigs mode\n")
+        logging.info("Running MitoHifi pipeline in contigs mode")
        
-        logging.info("Fixing potentially conflicting FASTA headers...\n")
+        logging.info("Fixing potentially conflicting FASTA headers...")
         original_contigs = args.c
         fixContigHeaders.fix_headers(original_contigs, "fixed_header_contigs.fasta")
         
@@ -289,12 +295,12 @@ def main():
         contigs = original_contigs
         
     
-    logging.info("\nLet's run the blast of the contigs versus the close-related mitogenome\n")
+    logging.info("Let's run the blast of the contigs versus the close-related mitogenome")
 
     makeblastdb = "makeblastdb -in " + args.f + " -dbtype nucl"
     logging.debug(makeblastdb)
     subprocess.run(["makeblastdb", "-in", args.f, "-dbtype", "nucl"], stderr=subprocess.STDOUT)
-    logging.debug("\nmakeblastdb done. Running blast with the contigs\n")
+    logging.debug("makeblastdb done. Running blast with the contigs")
     subprocess.run(["blastn", "-query", contigs, "-db", args.f, "-num_threads", str(args.t), "-out", "contigs.blastn", "-outfmt", "6 std qlen slen"], stderr=subprocess.STDOUT)
     logging.debug("Blast done!" + "\n")
 
@@ -320,7 +326,9 @@ def main():
 
     # if we can't find any contigs even in parsed_blast_all.txt, then we exit the pipeline
     if len(contigs_ids) == 0:
-        sys.exit("""\n Attention! \n The 'parsed_blast.txt' and 'parsed_blast_all.txt' files are empty. The pipeline has stopped !! \n You need to run further scripts to check if you have mito reads pulled to a large NUMT!!""")
+        sys.exit("""Attention!
+'parsed_blast.txt' and 'parsed_blast_all.txt' files are empty.
+The pipeline has stopped !! You need to run further scripts to check if you have mito reads pulled to a large NUMT!!""")
 
     # records all contigs kept for the downstream steps in a file called 'contigs_ids.txt'
     with open("contigs_ids.txt", "w") as f:
@@ -333,7 +341,7 @@ def main():
     except OSError:
         pass
       
-    logging.info("\n" + "6-) Now we are going to circularize, annotate and rotate each contig which is a potential mitogenome" + "\n")
+    logging.info("Now we are going to circularize, annotate and rotate each contig which is a potential mitogenome")
     
     # creates a dictionary that will save frameshifts information for each contig
     contig_shifts = {}
@@ -377,7 +385,7 @@ def main():
         if curr_file.endswith('mitogenome.rotated.fa'):
             contigs_files.append(curr_file)
     # first concatenate all rotated contigs into a single multifasta file
-    print("List of contigs that will be aligned: " + str(contigs_files) + "\n")
+    logging.info("List of contigs that will be aligned: " + str(contigs_files) + "\n")
     concat_fasta = alignContigs.concatenate_contigs(contigs_files)
     # then run MAFFT alignment between the rotated contigs using the multifasta as input and clustal as output format
     alignContigs.mafft_align(multifasta_file=concat_fasta, threads=args.t, clustal_format=True)
@@ -433,6 +441,8 @@ def main():
     cleanUpCWD.clean_up_work_dir(contigs_ids)
 
     logging.info("Pipeline finished!" )
+    runtime= time.time() - start_time
+    logging.info(f"Runtime: {runtime} seconds")
 
 if __name__ == '__main__':
     main()
