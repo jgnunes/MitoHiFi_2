@@ -250,11 +250,11 @@ def main():
     if args.r:
         logging.info("Running MitoHifi pipeline in reads mode\n")
        
-        logging.info("First we map your PacbioHiFi reads to the close-related mitogenome")
+        logging.info("First we map your Pacbio HiFi reads to the close-related mitogenome")
 
-        #print(shlex.split(args.r))
         minimap_cmd = ["minimap2", "-t", str(args.t), "--secondary=no", "-ax", "map-pb", args.f] + shlex.split(args.r) 
         samtools_cmd = ["samtools", "view", "-@", str(args.t), "-S", "-b", "-F4", "-F", "0x800"] 
+        logging.info(" ".join(minimap_cmd) + " | " + "".join(samtools_cmd) + " > " + )        
         minimap = subprocess.Popen(minimap_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         mapped_reads_f = open("reads.HiFiMapped.bam", "w")
         subprocess.run(samtools_cmd, stderr=subprocess.STDOUT, stdin=minimap.stdout, stdout=mapped_reads_f)
@@ -392,7 +392,7 @@ The pipeline has stopped !! You need to run further scripts to check if you have
     # then run MAFFT alignment between the rotated contigs using the multifasta as input and clustal as output format
     alignContigs.mafft_align(multifasta_file=concat_fasta, threads=args.t, clustal_format=True)
   
-    logging.info("\n" + "8-) Now we will choose the most representative contig" + "\n")
+    logging.info("Now we will choose the most representative contig" + "\n")
     repr_contig_id, repr_contig_cluster = getReprContig.get_repr_contig("all_mitogenomes.rotated.fa", args.t)
     logging.info("Representative contig is {} that belongs to {}. This contig will be our final mitogenome. See all contigs and clusters in cdhit.out.clstr".format(repr_contig_id, repr_contig_cluster))
     
