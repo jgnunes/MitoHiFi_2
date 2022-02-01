@@ -121,8 +121,7 @@ def get_most_freq_tRNA():
     return most_freq_tRNA
     
 def process_contig(threads_per_contig, circular_size, circular_offset, contigs, max_contig_size, rel_gbk, gen_code, contig_id): 
-    print(f"\nWorking with contig {contig_id}. Annotation will be done with {threads_per_contig} threads\n")
-    print(f"contigs: {contigs} | args.circular_size: {circular_size}") # for debugging
+    logging.info(f"\nWorking with contig {contig_id}")
     # retrieves the FASTA files for each contig
     filterfasta.filterFasta(idList=[contig_id], inStream=contigs, outPath="".join([contig_id, ".mito.fa"]), log=False)
     # circularizes each contig and saves circularization history to a file
@@ -353,7 +352,7 @@ def main():
     makeblastdb_cmd = ["makeblastdb", "-in", args.f, "-dbtype", "nucl"]
     logging.info(f"{step}.1. Creating BLAST database:")
     logging.info(" ".join(makeblastdb_cmd))
-    subprocess.run(makeblastdb_cmd, stderr=subprocess.DEVNULL)
+    subprocess.run(makeblastdb_cmd, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
     logging.info("Makeblastdb done.")
     
     blast_cmd = ["blastn", "-query", contigs, "-db", args.f, "-num_threads", str(args.t),
@@ -372,8 +371,7 @@ def main():
         f.close()    
 
     step += 1
-
-    logging.info("{step}. Filtering BLAST output to select target sequences")
+    logging.info(f"{step}. Filtering BLAST output to select target sequences")
 
     #the next script parses a series of conditions to exclude blast with NUMTs. 
     if args.a == "plant":
@@ -399,7 +397,7 @@ def main():
     if len(contigs_ids) == 0:
         sys.exit("""Attention!
 'parsed_blast.txt' and 'parsed_blast_all.txt' files are empty.
-The pipeline has stopped !! You need to run further scripts to check if you have mito reads pulled to a large NUMT!!""")
+The pipeline has stopped !! You need to run further scripts to check if you have mito reads pulled to a large NUMT!""")
 
     logging.info("Filtering BLAST finished. A list of the filtered contigs was saved on ./contigs_filtering/contigs_ids.txt file")
 
@@ -415,8 +413,7 @@ The pipeline has stopped !! You need to run further scripts to check if you have
         pass
 
     step += 1
-
-    logging.info(f"{step}. Now we are going to circularize, annotate and rotate each contig which is a potential mitogenome")
+    logging.info(f"{step}. Now we are going to circularize, annotate and rotate each filtered contig. Those are potential mitogenome(s).")
     
     # creates a dictionary that will save frameshifts information for each contig
     contig_shifts = {}
@@ -425,13 +422,17 @@ The pipeline has stopped !! You need to run further scripts to check if you have
     if args.t // len(contigs_ids) > 1:
         threads_per_contig = args.t // len(contigs_ids)
 
-    partial_process_contig = functools.partial(process_contig, threads_per_contig, args.circular_size, args.circular_offset, contigs, max_contig_size, args.g, args.o)
+    logging.debug(f"Threads per contig={threads_per_contig}")
+    logging.debug(f"Thresholds for circularization: circular size={args.circular_size} | circular offset={args.circular_offset}")
+
+    partial_process_contig = functools.partial(process_contig, threads_per_contig,
+                                               args.circular_size, args.circular_offset,
+                                               contigs, max_contig_size, args.g, args.o)
     with concurrent.futures.ProcessPoolExecutor() as executor:
         executor.map(partial_process_contig, contigs_ids)
     
     tRNA_ref = get_most_freq_tRNA() 
     logging.debug(f"tRNA_ref: {tRNA_ref}") #debug 
-    
     
     partial_process_contig_02 = functools.partial(process_contig_02, tRNA_ref, threads_per_contig, args.circular_size, args.circular_offset, contigs, max_contig_size, args.g, args.o)
     with concurrent.futures.ProcessPoolExecutor() as executor:
