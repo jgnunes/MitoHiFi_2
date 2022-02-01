@@ -13,11 +13,17 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
     '''
-            
+
+import logging            
 import pandas as pd
 import sys
 
 def parse_blast(query_perc=50, min_query_len=80, max_query_len=5):
+    
+    logging.info("Filtering BLAST output to select target sequences. Thresholds applied:")
+    logging.info(f"Minimum query percentage = {query_perc}")
+    logging.info(f"Minimum query length = {min_query_len}")
+    logging.info(f"Maximum query length = {max_query_len}")
     my_names = ["qseqid", "sseqid", "pident", "alilength" , "mismatch", "gapopen", "qstart", "qend", 
                 "sstart", "send", "evalue" , "bitscore", "leng_query", "s_length",]
 

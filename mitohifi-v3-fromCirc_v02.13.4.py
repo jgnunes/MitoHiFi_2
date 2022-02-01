@@ -228,7 +228,6 @@ def main():
         """, type=str, default='1')
     args = parser.parse_args()
     
-
     # Set log message format
     FORMAT='[%(asctime)s %(levelname)s] %(message)s'
 
@@ -342,7 +341,7 @@ def main():
         
         contigs = original_contigs
 
-    # Set number for the current step
+    # Set number for the current step (for improving understanding of the log)
     # On reads mode, it should be 4; on contigs mode, 2    
     if args.r:
         step = "4"
@@ -352,7 +351,7 @@ def main():
     logging.info(f"{step}. Let's run the blast of the contigs versus the close-related mitogenome")
 
     makeblastdb_cmd = ["makeblastdb", "-in", args.f, "-dbtype", "nucl"]
-    logging.info(" ".join(makeblastdb))
+    logging.info(" ".join(makeblastdb_cmd))
     subprocess.run(makeblastdb_cmd, stderr=subprocess.STDOUT)
     logging.info("makeblastdb done. Running blast with the contigs")
     blast_cmd = ["blastn", "-query", contigs, "-db", args.f, "-num_threads", str(args.t),
@@ -372,12 +371,12 @@ def main():
     if args.a == "plant":
         ## if species is a plant, set minimum query percentage equal to 0% of related mito 
         ## and maximum query lenght 10 times the lenght of the related
-        parse_blast.parse_blast(query_perc=args.p, min_query_len=0, max_query_len=10)
+        parse_blast.parse_blast(query_perc=args.p, min_query_len=0, max_query_len=10*rel_mito_len)
     else:
         ## if species is an animal, set minimum query percentage equal to 80% of related mito
         ## and maximum query length 5 times the length of the related (default values from 
         ## parse_blast function
-        parse_blast.parse_blast(query_perc=args.p)
+        parse_blast.parse_blast(query_perc=args.p, max_query_len=5*rel_mito_len)
 
     # select contigs to be circularized
     # first look for contigs in parsed_blast.txt
