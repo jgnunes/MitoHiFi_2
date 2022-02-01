@@ -23,6 +23,12 @@ import shlex
 from circularizationCheck import circularizationCheck
 import alignContigs
 
+def get_num_seqs(in_fasta):
+    c = 0
+    for rec in SeqIO.parse(inStream, "fasta"):
+        c += 1
+    return c
+
 def get_contigs_ids(blast_output):
     """
     args:
@@ -226,7 +232,7 @@ def main():
     # Set log message format
     FORMAT='[%(asctime)s %(levelname)s] %(message)s'
 
-    if args.d:
+    if args.d: # If in debug mode
         logging.basicConfig(level=logging.DEBUG, stream=sys.stdout,
                             format=FORMAT, datefmt='%Y-%m-%d %H:%M:%S')
     else:
@@ -243,31 +249,44 @@ def main():
     logging.info("Length of related mitogenome is: {} bp".format(rel_mito_len))
     logging.info("Number of genes on related mitogenome: {}".format(rel_mito_num_genes))
     
-    # Calculate maximum contig size accepted by mitofinder when annotating the contigs
+    # Set maximum contig size accepted by mitofinder when annotating the contigs
     max_contig_size = 5*rel_mito_len
 
     # If input are reads, map them to the related mitogenome and assemble the mapped ones
     if args.r:
-        logging.info("Running MitoHifi pipeline in reads mode\n")
-       
-        logging.info("First we map your Pacbio HiFi reads to the close-related mitogenome")
-
+        logging.info("Running MitoHifi pipeline in reads mode...")
+        logging.info("1. First we map your Pacbio HiFi reads to the close-related mitogenome")
         minimap_cmd = ["minimap2", "-t", str(args.t), "--secondary=no", "-ax", "map-pb", args.f] + shlex.split(args.r) 
         samtools_cmd = ["samtools", "view", "-@", str(args.t), "-S", "-b", "-F4", "-F", "0x800"] 
-        logging.info(" ".join(minimap_cmd) + " | " + "".join(samtools_cmd) + " > " + )        
+        logging.info(" ".join(minimap_cmd) + " | " + " ".join(samtools_cmd) + " > reads.HiFiMapped.bam")        
         minimap = subprocess.Popen(minimap_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         mapped_reads_f = open("reads.HiFiMapped.bam", "w")
         subprocess.run(samtools_cmd, stderr=subprocess.STDOUT, stdin=minimap.stdout, stdout=mapped_reads_f)
         minimap.wait()
         minimap.stdout.close()
 
-        logging.info("Now we filter out any mapped reads that are larger than the reference mitogenome to avoid NUMTS")
+        logging.info("2. Now we filter out any mapped reads that are larger than the reference mitogenome to avoid NUMTS")
+        bam2fasta_cmd = ["samtools", "fasta", "reads.HiFiMapped.bam"]
+        logging.info("2.1 First we convert the mapped reads from BAM to FASTA format:")
+        logging.info(" ".join(bam2fasta_cmd) + " > gbk.HiFiMapped.bam.fasta")
         mapped_fasta_f = open("gbk.HiFiMapped.bam.fasta", "w")
-        subprocess.run(["samtools", "fasta", "reads.HiFiMapped.bam"], stdout=mapped_fasta_f)
+        subprocess.run(bam2fasta_cmd, stdout=mapped_fasta_f)
+        before_filter = get_num_seqs("gbk.HiFiMapped.bam.fasta")
+        logging.info(f"Total number of mapped reads: {before_filter}")
 
-        filterfasta.filterFasta(minLength=rel_mito_len, neg=True, inStream="gbk.HiFiMapped.bam.fasta", outPath="gbk.HiFiMapped.bam.filtered.fasta")
+        logging.info("2.2 Then we filter reads that are larger than {rel_mito_len} bp")
+        filterfasta.filterFasta(minLength=rel_mito_len, neg=True, inStream="gbk.HiFiMapped.bam.fasta",
+                                outPath="gbk.HiFiMapped.bam.filtered.fasta")
+        try:
+            f = open("gbk.HiFiMapped.bam.filtered.fasta")
+        except FileNotFoundError:
+            sys.exit("""File gbk.HiFiMapped.bam.filtered.fasta does not exist.
+            An error may have occurred when filtering reads larger than the reference mitogenome""")
+        
+        after_filter = get_num_seqs("gbk.HiFiMapped.bam.filtered.fasta")
+        logging.info(f"Number of filtered reads: {after_filter}")
 
-        logging.info("Now let's run hifiasm to assemble the mapped and filtered reads!")
+        logging.info("3. Now let's run hifiasm to assemble the mapped and filtered reads!")
         
         with open("hifiasm.log", "w") as hifiasm_log_f:
             subprocess.run(["hifiasm", "-t", str(args.t), "-f", str(args.m), "-o", "gbk.HiFiMapped.bam.filtered.assembled", "gbk.HiFiMapped.bam.filtered.fasta", ], stderr=subprocess.STDOUT, stdout=hifiasm_log_f)
@@ -444,7 +463,7 @@ The pipeline has stopped !! You need to run further scripts to check if you have
 
     logging.info("Pipeline finished!" )
     runtime= time.time() - start_time
-    logging.info(f"Runtime: {runtime} seconds")
+    logging.info(f"Run time: {runtime} seconds")
 
 if __name__ == '__main__':
     main()
