@@ -25,7 +25,7 @@ import alignContigs
 
 def get_num_seqs(in_fasta):
     c = 0
-    for rec in SeqIO.parse(inStream, "fasta"):
+    for rec in SeqIO.parse(in_fasta, "fasta"):
         c += 1
     return c
 
@@ -264,6 +264,14 @@ def main():
         subprocess.run(samtools_cmd, stderr=subprocess.STDOUT, stdin=minimap.stdout, stdout=mapped_reads_f)
         minimap.wait()
         minimap.stdout.close()
+        
+        try:
+            f = open("reads.HiFiMapped.bam")
+        except FileNotFoundError:
+            sys.exit("""No reads.HiFiMapped.bam file.
+            An error may have occurred when mapping reads to the close-related mitogenome""")
+        finally:
+            f.close()
 
         logging.info("2. Now we filter out any mapped reads that are larger than the reference mitogenome to avoid NUMTS")
         bam2fasta_cmd = ["samtools", "fasta", "reads.HiFiMapped.bam"]
@@ -277,20 +285,39 @@ def main():
         logging.info("2.2 Then we filter reads that are larger than {rel_mito_len} bp")
         filterfasta.filterFasta(minLength=rel_mito_len, neg=True, inStream="gbk.HiFiMapped.bam.fasta",
                                 outPath="gbk.HiFiMapped.bam.filtered.fasta")
+        
         try:
             f = open("gbk.HiFiMapped.bam.filtered.fasta")
         except FileNotFoundError:
-            sys.exit("""File gbk.HiFiMapped.bam.filtered.fasta does not exist.
+            sys.exit("""No gbk.HiFiMapped.bam.filtered.fasta file.
             An error may have occurred when filtering reads larger than the reference mitogenome""")
-        
+        finally:
+            f.close()
+
         after_filter = get_num_seqs("gbk.HiFiMapped.bam.filtered.fasta")
         logging.info(f"Number of filtered reads: {after_filter}")
 
         logging.info("3. Now let's run hifiasm to assemble the mapped and filtered reads!")
         
+        # needs to update using the primary flag for newer Hifiasm versions
+        hifiasm_cmd = ["hifiasm", "-t", str(args.t), "-f", str(args.m), "-o",
+                    "gbk.HiFiMapped.bam.filtered.assembled",
+                    "gbk.HiFiMapped.bam.filtered.fasta"]
+
+        logging.info(" ".join(hifiasm_cmd))
         with open("hifiasm.log", "w") as hifiasm_log_f:
-            subprocess.run(["hifiasm", "-t", str(args.t), "-f", str(args.m), "-o", "gbk.HiFiMapped.bam.filtered.assembled", "gbk.HiFiMapped.bam.filtered.fasta", ], stderr=subprocess.STDOUT, stdout=hifiasm_log_f)
+            subprocess.run(hifiasm_cmd, stderr=subprocess.STDOUT, stdout=hifiasm_log_f)       
         
+        try:
+            f1 = open("gbk.HiFiMapped.bam.filtered.assembled.p_ctg.gfa")
+            f2 = open("gbk.HiFiMapped.bam.filtered.assembled.a_ctg.gfa")
+        except FileNotFoundError:
+            sys.exit("""No gbk.HiFiMapped.bam.filtered.assembled.[a/p]_ctg.gfa file(s).
+            An error may have occurred when assembling reads with HiFiasm.""")
+        finally:
+            f1.close()
+            f2.close()
+
         gfa2fa_script = os.path.join(os.path.dirname(os.path.realpath(__file__)),"gfa2fa") # gets path to gfa2fa script
         
         with open("gbk.HiFiMapped.bam.filtered.assembled.p_ctg.fa", "w") as p_ctg_f:
@@ -304,9 +331,9 @@ def main():
         contigs = "hifiasm.contigs.fasta"
     
     else:
-        logging.info("Running MitoHifi pipeline in contigs mode")
+        logging.info("Running MitoHifi pipeline in contigs mode...")
        
-        logging.info("Fixing potentially conflicting FASTA headers...")
+        logging.info("1. Fixing potentially conflicting FASTA headers")
         original_contigs = args.c
         fixContigHeaders.fix_headers(original_contigs, "fixed_header_contigs.fasta")
         
@@ -314,16 +341,32 @@ def main():
         shutil.move("fixed_header_contigs.fasta", original_contigs) # replace original contigs file by the version that has the headers fixed
         
         contigs = original_contigs
-        
-    
-    logging.info("Let's run the blast of the contigs versus the close-related mitogenome")
 
-    makeblastdb = "makeblastdb -in " + args.f + " -dbtype nucl"
-    logging.debug(makeblastdb)
-    subprocess.run(["makeblastdb", "-in", args.f, "-dbtype", "nucl"], stderr=subprocess.STDOUT)
-    logging.debug("makeblastdb done. Running blast with the contigs")
-    subprocess.run(["blastn", "-query", contigs, "-db", args.f, "-num_threads", str(args.t), "-out", "contigs.blastn", "-outfmt", "6 std qlen slen"], stderr=subprocess.STDOUT)
-    logging.debug("Blast done!" + "\n")
+    # Set number for the current step
+    # On reads mode, it should be 4; on contigs mode, 2    
+    if args.r:
+        step = "4"
+    else:
+        step = "2" 
+
+    logging.info(f"{step}. Let's run the blast of the contigs versus the close-related mitogenome")
+
+    makeblastdb_cmd = ["makeblastdb", "-in", args.f, "-dbtype", "nucl"]
+    logging.info(" ".join(makeblastdb))
+    subprocess.run(makeblastdb_cmd, stderr=subprocess.STDOUT)
+    logging.info("makeblastdb done. Running blast with the contigs")
+    blast_cmd = ["blastn", "-query", contigs, "-db", args.f, "-num_threads", str(args.t),
+                "-out", "contigs.blastn", "-outfmt", "6 std qlen slen"]
+    subprocess.run(blast_cmd, stderr=subprocess.STDOUT)
+    logging.info("Blast done!" + "\n")
+
+    try:
+        f = open("contigs.blastn")
+    except FileNotFoundError:
+        sys.exit("""No contigs.blastn file.
+        An error may have occurred when BLASTing contigs against close-related mitogenome""")
+    finally:
+        f.close()    
 
     #the next script parses a series of conditions to exclude blast with NUMTs. 
     if args.a == "plant":
