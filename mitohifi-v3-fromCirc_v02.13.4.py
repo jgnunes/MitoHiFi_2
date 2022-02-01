@@ -54,9 +54,8 @@ def get_circo_mito(contig_id, circular_size, circular_offset):
     args:
     the ID from the contig that we want to circularize
     """
-    logging.debug("Defining cut_coords function...\n") # for debugging
     def cut_coords(contig_fasta, circularization_position, fasta_out):
-        print(f"cut_coords function called!\ncontig_fasta: {contig_fasta}; circularization_position: {circularization_position}; fasta_out: {fasta_out}") # for debugging
+        #print(f"cut_coords function called!\ncontig_fasta: {contig_fasta}; circularization_position: {circularization_position}; fasta_out: {fasta_out}") # for debugging
         record=SeqIO.read(contig_fasta, "fasta")
         id = record.id
         get= record[circularization_position:]
@@ -121,37 +120,38 @@ def get_most_freq_tRNA():
     return most_freq_tRNA
     
 def process_contig(threads_per_contig, circular_size, circular_offset, contigs, max_contig_size, rel_gbk, gen_code, contig_id): 
-    logging.info(f"\nWorking with contig {contig_id}")
+    logging.info(f"\nWorking with contig {contig_id}") 
     # retrieves the FASTA files for each contig
     filterfasta.filterFasta(idList=[contig_id], inStream=contigs, outPath="".join([contig_id, ".mito.fa"]), log=False)
     # circularizes each contig and saves circularization history to a file
+    logging.info(f"Started {contig_id} circularization")
     circularization_history = get_circo_mito(contig_id, circular_size, circular_offset)
-    #for circularization_event in circularization_history: 
-        #with open('all_contigs.circularisationCheck.txt', 'a') as f:
-            #f.write("\t".join([contig_id, circularization_event, "\n"])) 
+    logging.info(f"{contig_id} circularization done. Circularization info saved on ./potential_contigs/{contig_id}/{contig_id}.circularisationCheck.txt")
     # annotates mitogenome(s) using mitofinder
-    print("Running mitofinder with maximum contig size of {} bp".format(max_contig_size))
-    subprocess.run(["mitofinder", "--new-genes", "--max-contig-size", str(max_contig_size), "-j", contig_id+".annotation", "-a", contig_id+".mitogenome.fa", "-r", rel_gbk, "-o", gen_code, "-p", str(threads_per_contig)], stderr=subprocess.STDOUT)
+    logging.info(f"Started {contig_id} (MitoFinder) annotation")
+    mitofinder_cmd = ["mitofinder", "--new-genes", "--max-contig-size", str(max_contig_size),
+                    "-j", contig_id+".annotation", "-a", contig_id+".mitogenome.fa",
+                    "-r", rel_gbk, "-o", gen_code, "-p", str(threads_per_contig)] 
+    subprocess.run(mitofinder_cmd, stderr=subprocess.DEVNULL)
+    logging.info(f"{contig_id} annotation done. Annotation log saved on ./potential_contigs/{contig_id}/{contig_id}.annotation_MitoFinder.log")
     # rotates the mitogenome
     mitogenome_gb = os.path.join(contig_id + ".annotation", contig_id + ".annotation_MitoFinder_mitfi_Final_Results", contig_id + ".annotation_mtDNA_contig.gb") 
     if not os.path.isfile(mitogenome_gb):
-        warnings.warn("Contig "+ contig_id + " does not have an annotation file, check MitoFinder's output")
+        warnings.warn("Contig "+ contig_id + " does not have an annotation file, check MitoFinder's log")
         return
     
     trnas = rotation.get_trna_pos(mitogenome_gb)
-    print(f"trnas: {trnas}") #debug
     if trnas:
         with open(f"{contig_id}.trnas", "w") as outfile:
             for trna in trnas:
                 outfile.write("\t".join([trna, trnas[trna][0], trnas[trna][1], "\n"]))
         return
     else:
-        warnings.warn('No tRNA gene found in ' + mitogenome_gb + '... Skipping contig ' + contig_id + '\n')
+        warnings.warn(f"No tRNA gene found in {mitogenome_gb}... Skipping contig {contig_id}")
         return
 
 
 def process_contig_02(ref_tRNA, threads_per_contig, circular_size, circular_offset, contigs, max_contig_size, rel_gbk, gen_code, contig_id): 
-    print("Started process_contig_02...") #debug 
     if not os.path.isfile(f"{contig_id}.trnas"):
         warnings.warn(f"Contig {contig_id} does not have annotated tRNAs, skipping it...")
         return
@@ -247,9 +247,6 @@ def main():
     logging.info("Length of related mitogenome is: {} bp".format(rel_mito_len))
     logging.info("Number of genes on related mitogenome: {}".format(rel_mito_num_genes))
     
-    # Set maximum contig size accepted by mitofinder when annotating the contigs
-    max_contig_size = 5*rel_mito_len
-
     # If input are reads, map them to the related mitogenome and assemble the mapped ones
     if args.r:
         logging.info("Running MitoHifi pipeline in reads mode...")
@@ -415,6 +412,9 @@ The pipeline has stopped !! You need to run further scripts to check if you have
     step += 1
     logging.info(f"{step}. Now we are going to circularize, annotate and rotate each filtered contig. Those are potential mitogenome(s).")
     
+    # Set maximum contig size accepted by mitofinder when annotating the contigs
+    max_contig_size = 5*rel_mito_len
+
     # creates a dictionary that will save frameshifts information for each contig
     contig_shifts = {}
 
@@ -424,7 +424,7 @@ The pipeline has stopped !! You need to run further scripts to check if you have
 
     logging.debug(f"Threads per contig={threads_per_contig}")
     logging.debug(f"Thresholds for circularization: circular size={args.circular_size} | circular offset={args.circular_offset}")
-
+    logging.debug(f"Thresholds for annotation (MitoFinder): maximum contig size={max_contig_size}")
     partial_process_contig = functools.partial(process_contig, threads_per_contig,
                                                args.circular_size, args.circular_offset,
                                                contigs, max_contig_size, args.g, args.o)

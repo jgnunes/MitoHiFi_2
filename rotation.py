@@ -15,7 +15,7 @@ def get_trna_pos(path):
             for trna in record.features:
                 if trna.type == 'gene' and 'product' in trna.qualifiers and \
                     'tRNA' in trna.qualifiers['product'][0]:
-                    print(trna.qualifiers['product']) #debug
+                    #print(trna.qualifiers['product']) #debug
                     tRNA_name = trna.qualifiers['product'][0]
                     tRNA_start = str(int(trna.location.start))
                     tRNA_strand = str(trna.location.strand)
