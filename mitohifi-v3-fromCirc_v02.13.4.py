@@ -100,7 +100,7 @@ def get_circo_mito(contig_id, circular_size, circular_offset):
     print(f"circularization_history: {circularization_history}") # for debugging
     return circularization_history
 
-def get_most_freq_tRNA():
+def get_ref_tRNA():
     tRNAs = {}
     for curr_file in os.listdir('.'):
         if curr_file.endswith('.trnas'):
@@ -111,13 +111,13 @@ def get_most_freq_tRNA():
                         tRNAs[tRNA] = 1
                     else:
                         tRNAs[tRNA] += 1
-    print(f"tRNAS: {tRNAs}") #debug
+    #print(f"tRNAS: {tRNAs}") #debug
     # if any contig has a tRNA-Phe, use it as the reference gene for rotation
     if 'tRNA-Phe' in tRNAs:
-        most_freq_tRNA = 'tRNA-Phe'
+        reference_tRNA = 'tRNA-Phe'
     else:
-        most_freq_tRNA = max(tRNAs, key=tRNAs.get)
-    return most_freq_tRNA
+        reference_tRNA = max(tRNAs, key=tRNAs.get)
+    return reference_tRNA
     
 def process_contig(threads_per_contig, circular_size, circular_offset, contigs, max_contig_size, rel_gbk, gen_code, contig_id): 
     logging.info(f"\nWorking with contig {contig_id}") 
@@ -132,7 +132,7 @@ def process_contig(threads_per_contig, circular_size, circular_offset, contigs, 
     mitofinder_cmd = ["mitofinder", "--new-genes", "--max-contig-size", str(max_contig_size),
                     "-j", contig_id+".annotation", "-a", contig_id+".mitogenome.fa",
                     "-r", rel_gbk, "-o", gen_code, "-p", str(threads_per_contig)] 
-    subprocess.run(mitofinder_cmd, stderr=subprocess.DEVNULL)
+    subprocess.run(mitofinder_cmd, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
     logging.info(f"{contig_id} annotation done. Annotation log saved on ./potential_contigs/{contig_id}/{contig_id}.annotation_MitoFinder.log")
     # rotates the mitogenome
     mitogenome_gb = os.path.join(contig_id + ".annotation", contig_id + ".annotation_MitoFinder_mitfi_Final_Results", contig_id + ".annotation_mtDNA_contig.gb") 
@@ -152,6 +152,8 @@ def process_contig(threads_per_contig, circular_size, circular_offset, contigs, 
 
 
 def process_contig_02(ref_tRNA, threads_per_contig, circular_size, circular_offset, contigs, max_contig_size, rel_gbk, gen_code, contig_id): 
+    
+    logging.info(f"Started {contig_id} rotation. Using {ref-tRNA} as reference gene.")
     if not os.path.isfile(f"{contig_id}.trnas"):
         warnings.warn(f"Contig {contig_id} does not have annotated tRNAs, skipping it...")
         return
@@ -166,7 +168,7 @@ def process_contig_02(ref_tRNA, threads_per_contig, circular_size, circular_offs
         warnings.warn(f"Reference gene {ref_tRNA} is not present in contig {contig_id}. Skipping contig...")
         return
 
-    print(f"start: {start} | strang: {strand}") #debug
+    #print(f"start: {start} | strang: {strand}") #debug
     mitogenome_gb = os.path.join(contig_id + ".annotation", contig_id + ".annotation_MitoFinder_mitfi_Final_Results", contig_id + ".annotation_mtDNA_contig.gb")
 
     genome = contig_id + ".mitogenome.fa"
@@ -179,10 +181,11 @@ def process_contig_02(ref_tRNA, threads_per_contig, circular_size, circular_offs
         #start, strand = rotation.get_phe_pos(new_gb)
         genome = rc
     rotation.rotate(genome, start, contig_id)
-    print(' '.join([f'Rotated to {ref_tRNA} genome is at', os.path.join(os.path.dirname(genome), contig_id + '.mitogenome.rotated.fa')]))
     if new_gb:
-        print(f"new_gb: {new_gb}")
-        print('Mitogenome annotation is at ', new_gb)
+        logging.info(f"{ref_tRNA} is at reverse complement of {contig_id}.mitogenome.fa")
+        logging.(f"For that reason we have generated a new genbank (reverse complemented): {new_gb}")
+    
+    logging.info(f"Rotation of {contig_id} done. Rotated is at", os.path.join(os.path.dirname(genome), contig_id + '.mitogenome.rotated.fa')) 
     # check frameshifts in genes from contig and append save findings to 
     # `{contig_id}.individual.stats` intermediate file
     frameshifts = findFrameShifts.find_frameshifts(mitogenome_gb)
@@ -431,10 +434,13 @@ The pipeline has stopped !! You need to run further scripts to check if you have
     with concurrent.futures.ProcessPoolExecutor() as executor:
         executor.map(partial_process_contig, contigs_ids)
     
-    tRNA_ref = get_most_freq_tRNA() 
-    logging.debug(f"tRNA_ref: {tRNA_ref}") #debug 
+    tRNA_ref = get_ref_tRNA() 
+    logging.debug(f"tRNA to be used as reference for rotation: {tRNA_ref}") 
     
-    partial_process_contig_02 = functools.partial(process_contig_02, tRNA_ref, threads_per_contig, args.circular_size, args.circular_offset, contigs, max_contig_size, args.g, args.o)
+    partial_process_contig_02 = functools.partial(process_contig_02, tRNA_ref,
+                                                threads_per_contig, args.circular_size,
+                                                args.circular_offset, contigs, max_contig_size,
+                                                args.g, args.o)
     with concurrent.futures.ProcessPoolExecutor() as executor:
         executor.map(partial_process_contig_02, contigs_ids)
 
