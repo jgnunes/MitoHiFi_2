@@ -211,7 +211,7 @@ def main():
     mutually_exclusive_group.add_argument("-c", help= "-c: Assemnbled fasta contigs/scaffolds to be searched to find mitogenome")
     parser.add_argument("-h", "--help", action="help", default=argparse.SUPPRESS, help= "Print this help message.")
     parser.add_argument("-f", help= "-f: Close-related Mitogenome is fasta format", required = "True")
-    parser.add_argument("-d", help="-d: debug mode to output additional info on log", default=False)
+    parser.add_argument("-d", help="-d: debug mode to output additional info on log")
     parser.add_argument("-g", help= "-k: Close-related species Mitogenome in genebank format", required = "True")
     parser.add_argument("-a", help="-a: Choose between animal (default) or plant", default="animal", choices=["animal", "plant"])
     parser.add_argument("-t", help= "-t: Number of threads for (i) hifiasm and (ii) the blast search", required = "True", type=int)
