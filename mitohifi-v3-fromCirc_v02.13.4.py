@@ -153,7 +153,7 @@ def process_contig(threads_per_contig, circular_size, circular_offset, contigs, 
 
 def process_contig_02(ref_tRNA, threads_per_contig, circular_size, circular_offset, contigs, max_contig_size, rel_gbk, gen_code, contig_id): 
     
-    logging.info(f"Started {contig_id} rotation. Using {ref-tRNA} as reference gene.")
+    logging.info(f"Started {contig_id} rotation. Using {ref_tRNA} as reference gene.")
     if not os.path.isfile(f"{contig_id}.trnas"):
         warnings.warn(f"Contig {contig_id} does not have annotated tRNAs, skipping it...")
         return
