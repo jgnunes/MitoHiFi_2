@@ -183,7 +183,7 @@ def process_contig_02(ref_tRNA, threads_per_contig, circular_size, circular_offs
     rotation.rotate(genome, start, contig_id)
     if new_gb:
         logging.info(f"{ref_tRNA} is at reverse complement of {contig_id}.mitogenome.fa")
-        logging.(f"For that reason we have generated a new genbank (reverse complemented): {new_gb}")
+        logging.info(f"For that reason we have generated a new genbank (reverse complemented): {new_gb}")
     
     logging.info(f"Rotation of {contig_id} done. Rotated is at", os.path.join(os.path.dirname(genome), contig_id + '.mitogenome.rotated.fa')) 
     # check frameshifts in genes from contig and append save findings to 
