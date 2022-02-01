@@ -18,17 +18,16 @@ import logging
 import pandas as pd
 import sys
 
-def parse_blast(query_perc=50, min_query_len=80, max_query_len=5):
-    
-    logging.info("Filtering BLAST output to select target sequences. Thresholds applied:")
+def parse_blast(query_perc=50, min_query_perc=80, max_query_len=5):
+    logging.info("Filtering thresholds applied:")
     logging.info(f"Minimum query percentage = {query_perc}")
-    logging.info(f"Minimum query length = {min_query_len}")
-    logging.info(f"Maximum query length = {max_query_len}")
+    logging.info(f"Minimum query length = {min_query_perc}% subject length")
+    logging.info(f"Maximum query length = {max_query_len} times subject length")
     my_names = ["qseqid", "sseqid", "pident", "alilength" , "mismatch", "gapopen", "qstart", "qend", 
                 "sstart", "send", "evalue" , "bitscore", "leng_query", "s_length",]
 
     blast_cov = pd.read_csv("contigs.blastn", 
-                            sep="\t", names = my_names, )
+                            sep="\t", names = my_names)
 
     #Get the percentage of the query in the blast aligment
     blast_cov['alilength']*100 / (blast_cov['leng_query'])
@@ -44,16 +43,16 @@ def parse_blast(query_perc=50, min_query_len=80, max_query_len=5):
     result = pd.merge(a, seqsizes, on='qseqid')
     result
     # Now let's filter the blast matches
-    # if the lenght of the query is 5x the size of the subject (close-related mitogenome), drop it. (As its likely the match belongs to a NUMT)
-    print(f"max_query_len: {max_query_len}") # for debugging
-    five_times = (result['s_length'] * max_query_len)
-    result1 = result[(result['leng_query'] < five_times)].sort_values(by='%q_in_match', ascending=False)
+    # if the lenght of the query is `max_query_len` times (or greater than)
+    # the size of the subject (close-related mitogenome), drop it. 
+    # (As its likely the match belongs to a NUMT)
+    n_times = (result['s_length'] * max_query_len)
+    result1 = result[(result['leng_query'] < n_times)].sort_values(by='%q_in_match', ascending=False)
 
     # if the lenght of the query is 80% smaller than the length of the subject, drop it. It's unlikely you will have a complete mitogenome.
-    print(f"min_query_len: {min_query_len}") # for debugging
     slen=result1['s_length']
     result1['perc'] = result1["leng_query"]*100/(result1["s_length"])
-    ac=result1[result1['perc'] > min_query_len].sort_values(by='%q_in_match')
+    ac=result1[result1['perc'] > min_query_perc].sort_values(by='%q_in_match')
 
     # if the % of the query in the blast match is smaller than 70%, drop it
     #ac[(ac['%q_in_match'] > 60)].sort_values(by='%q_in_match', ascending=False)

@@ -124,7 +124,7 @@ def process_contig(threads_per_contig, circular_size, circular_offset, contigs, 
     print(f"\nWorking with contig {contig_id}. Annotation will be done with {threads_per_contig} threads\n")
     print(f"contigs: {contigs} | args.circular_size: {circular_size}") # for debugging
     # retrieves the FASTA files for each contig
-    filterfasta.filterFasta(idList=[contig_id], inStream=contigs, outPath="".join([contig_id, ".mito.fa"]))
+    filterfasta.filterFasta(idList=[contig_id], inStream=contigs, outPath="".join([contig_id, ".mito.fa"]), log=False)
     # circularizes each contig and saves circularization history to a file
     circularization_history = get_circo_mito(contig_id, circular_size, circular_offset)
     #for circularization_event in circularization_history: 
@@ -277,13 +277,13 @@ def main():
         logging.info("2.1 First we convert the mapped reads from BAM to FASTA format:")
         logging.info(" ".join(bam2fasta_cmd) + " > gbk.HiFiMapped.bam.fasta")
         mapped_fasta_f = open("gbk.HiFiMapped.bam.fasta", "w")
-        subprocess.run(bam2fasta_cmd, stdout=mapped_fasta_f)
+        subprocess.run(bam2fasta_cmd, stdout=mapped_fasta_f, stderr=subprocess.DEVNULL)
         before_filter = get_num_seqs("gbk.HiFiMapped.bam.fasta")
         logging.info(f"Total number of mapped reads: {before_filter}")
 
-        logging.info("2.2 Then we filter reads that are larger than {rel_mito_len} bp")
+        logging.info(f"2.2 Then we filter reads that are larger than {rel_mito_len} bp")
         filterfasta.filterFasta(minLength=rel_mito_len, neg=True, inStream="gbk.HiFiMapped.bam.fasta",
-                                outPath="gbk.HiFiMapped.bam.filtered.fasta")
+                                outPath="gbk.HiFiMapped.bam.filtered.fasta", log=False)
         
         try:
             f = open("gbk.HiFiMapped.bam.filtered.fasta")
@@ -344,20 +344,24 @@ def main():
     # Set number for the current step (for improving understanding of the log)
     # On reads mode, it should be 4; on contigs mode, 2    
     if args.r:
-        step = "4"
+        step = 4
     else:
-        step = "2" 
+        step = 2 
 
     logging.info(f"{step}. Let's run the blast of the contigs versus the close-related mitogenome")
 
     makeblastdb_cmd = ["makeblastdb", "-in", args.f, "-dbtype", "nucl"]
+    logging.info(f"{step}.1. Creating BLAST database:")
     logging.info(" ".join(makeblastdb_cmd))
-    subprocess.run(makeblastdb_cmd, stderr=subprocess.STDOUT)
-    logging.info("makeblastdb done. Running blast with the contigs")
+    subprocess.run(makeblastdb_cmd, stderr=subprocess.DEVNULL)
+    logging.info("Makeblastdb done.")
+    
     blast_cmd = ["blastn", "-query", contigs, "-db", args.f, "-num_threads", str(args.t),
                 "-out", "contigs.blastn", "-outfmt", "6 std qlen slen"]
+    logging.info(f"{step}.2. Running blast of contigs against close-related mitogenome:")
+    logging.info(" ".join(blast_cmd))
     subprocess.run(blast_cmd, stderr=subprocess.STDOUT)
-    logging.info("Blast done!" + "\n")
+    logging.info("Blast done.")
 
     try:
         f = open("contigs.blastn")
@@ -367,16 +371,20 @@ def main():
     finally:
         f.close()    
 
+    step += 1
+
+    logging.info("{step}. Filtering BLAST output to select target sequences")
+
     #the next script parses a series of conditions to exclude blast with NUMTs. 
     if args.a == "plant":
         ## if species is a plant, set minimum query percentage equal to 0% of related mito 
         ## and maximum query lenght 10 times the lenght of the related
-        parse_blast.parse_blast(query_perc=args.p, min_query_len=0, max_query_len=10*rel_mito_len)
+        parse_blast.parse_blast(query_perc=args.p, min_query_perc=0, max_query_len=10)
     else:
         ## if species is an animal, set minimum query percentage equal to 80% of related mito
         ## and maximum query length 5 times the length of the related (default values from 
         ## parse_blast function
-        parse_blast.parse_blast(query_perc=args.p, max_query_len=5*rel_mito_len)
+        parse_blast.parse_blast(query_perc=args.p, max_query_len=5)
 
     # select contigs to be circularized
     # first look for contigs in parsed_blast.txt
@@ -393,6 +401,8 @@ def main():
 'parsed_blast.txt' and 'parsed_blast_all.txt' files are empty.
 The pipeline has stopped !! You need to run further scripts to check if you have mito reads pulled to a large NUMT!!""")
 
+    logging.info("Filtering BLAST finished. A list of the filtered contigs was saved on ./contigs_filtering/contigs_ids.txt file")
+
     # records all contigs kept for the downstream steps in a file called 'contigs_ids.txt'
     with open("contigs_ids.txt", "w") as f:
         for contig_id in contigs_ids:
@@ -403,8 +413,10 @@ The pipeline has stopped !! You need to run further scripts to check if you have
         os.remove('all_contigs.circularisationCheck.txt')
     except OSError:
         pass
-      
-    logging.info("Now we are going to circularize, annotate and rotate each contig which is a potential mitogenome")
+
+    step += 1
+
+    logging.info(f"{step}. Now we are going to circularize, annotate and rotate each contig which is a potential mitogenome")
     
     # creates a dictionary that will save frameshifts information for each contig
     contig_shifts = {}

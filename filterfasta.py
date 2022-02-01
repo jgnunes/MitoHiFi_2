@@ -41,8 +41,8 @@ def filterFasta(inStream, outPath, minLength=None, idList=None,
     
 
 def filterLengthIdList(inStream, outPath, format, minLength=None, 
-                       idList=None, regex=False, neg=False, log=os.devnull):
-    log.write("".join(("isNeg? ", str(neg))))
+                       idList=None, regex=False, neg=False, log=sys.stderr):
+    #log.write("".join(("isNeg? ", str(neg))))
     if not idList is None:
         if regex:
             idRes = [re.compile(x) for x in idList]
