@@ -111,7 +111,7 @@ def get_repr_contig(contigs_fasta, rel_mito_len, threads="1", debug=False):
     cdhit_cmd = ["cd-hit-est", "-i", contigs_fasta, "-d", "0", "-c", c_threshold, "-n", wordsize, "-o", cdhit_out, "-T", str(threads), "-M", "0"]
     subprocess.run(cdhit_cmd, shell=False, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
 
-    repr_contig_id, repr_contig_cluster = get_repr_contig_info(cdhit_out_clstr, rel_mito_len, debug)
+    repr_contig_id, repr_contig_cluster = get_repr_contig_info(cdhit_out_clstr, rel_mito_len, debug=debug)
     return (repr_contig_id, repr_contig_cluster)
 
 if __name__ == "__main__":
