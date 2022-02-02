@@ -472,14 +472,15 @@ The pipeline has stopped !! You need to run further scripts to check if you have
     concat_fasta = alignContigs.concatenate_contigs(contigs_files)
     # then run MAFFT alignment between the rotated contigs using the multifasta as input and clustal as output format
     alignContigs.mafft_align(multifasta_file=concat_fasta, threads=args.t, clustal_format=True)
-  
+    logging.info("Alignment done and saved at ./final_mitogenome_choice/all_mitogenomes.rotated.aligned.fa\n")
+
     logging.info("Now we will choose the most representative contig" + "\n")
     repr_contig_id, repr_contig_cluster = getReprContig.get_repr_contig("all_mitogenomes.rotated.fa", args.t)
     logging.info("Representative contig is {} that belongs to {}. This contig will be our final mitogenome. See all contigs and clusters in cdhit.out.clstr".format(repr_contig_id, repr_contig_cluster))
     
     repr_contig_fasta = repr_contig_id + ".mitogenome.rotated.fa"
     repr_contig_get_gb = ["mitofinder", "--new-genes", "--max-contig-size", str(max_contig_size), "-j", "final_mitogenome.annotation", "-a", repr_contig_fasta, "-r", args.g, "-o", args.o, "-p", str(args.p)]
-    subprocess.run(repr_contig_get_gb, stderr=subprocess.STDOUT)
+    subprocess.run(repr_contig_get_gb, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
 
     final_fasta = os.path.join("final_mitogenome.annotation", "final_mitogenome.annotation_MitoFinder_mitfi_Final_Results", "final_mitogenome.annotation_mtDNA_contig.fasta")
     final_gbk = os.path.join("final_mitogenome.annotation", "final_mitogenome.annotation_MitoFinder_mitfi_Final_Results", "final_mitogenome.annotation_mtDNA_contig.gb")

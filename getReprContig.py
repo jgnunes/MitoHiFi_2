@@ -40,7 +40,7 @@ def get_repr_contig(contigs_fasta, threads="1"):
     cdhit_out = "cdhit.out"
     cdhit_out_clstr = cdhit_out + ".clstr"
     cdhit_cmd = ["cd-hit-est", "-i", contigs_fasta, "-d", "0", "-c", c_threshold, "-n", wordsize, "-o", cdhit_out, "-T", str(threads), "-M", "0"]
-    subprocess.run(cdhit_cmd, shell=False)
+    subprocess.run(cdhit_cmd, shell=False, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
 
     repr_contig_cluster, repr_contig_info = get_largest_cluster(cdhit_out_clstr)
     if "_rc_" in repr_contig_info:

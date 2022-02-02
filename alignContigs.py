@@ -1,4 +1,5 @@
 import os
+import logging
 import subprocess
 from Bio import SeqIO
 from Bio.Seq import Seq
@@ -18,11 +19,11 @@ def concatenate_contigs(contigs_list, out_file="all_mitogenomes.rotated.fa"):
 
 def mafft_align(multifasta_file, threads='1', out_file="all_mitogenomes.rotated.aligned.fa", clustal_format=False):
     if clustal_format:
-        print("MAFFT output will be in clustal format")
+        #logging.info("MAFFT output will be in clustal format")
         mafft = "mafft --quiet --clustalout --thread {} {} > {}".format(threads, multifasta_file, out_file)
     else:
         mafft = "mafft --quiet --thread {} {} > {}".format(threads, multifasta_file, out_file)
-    print("MAFFT alignment will be called with:\n" + mafft + "\n")
+    logging.info("MAFFT alignment will be called with:\n" + mafft + "\n")
     subprocess.run(mafft, shell=True)
 
 if __name__ == '__main__':
