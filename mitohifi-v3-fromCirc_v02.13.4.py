@@ -168,26 +168,24 @@ def process_contig_02(ref_tRNA, threads_per_contig, circular_size, circular_offs
         warnings.warn(f"Reference gene {ref_tRNA} is not present in contig {contig_id}. Skipping contig...")
         return
 
-    #print(f"start: {start} | strang: {strand}") #debug
     mitogenome_gb = os.path.join(contig_id + ".annotation", contig_id + ".annotation_MitoFinder_mitfi_Final_Results", contig_id + ".annotation_mtDNA_contig.gb")
 
     genome = contig_id + ".mitogenome.fa"
-    new_gb = None
     if strand == -1:
+        logging.info(f"{ref_tRNA} is at reverse complement of {contig_id}.mitogenome.fa")
+        logging.info(f"For that reason we'll reverse complement {contig_id}.mitogenome.fa before the rotation")
         genome_rc = contig_id + "_RC.mitogenome.fa"
         rc = os.path.join(os.path.dirname(genome), genome_rc)
         rotation.make_rc(genome, rc)
-        new_gb = rotation.annotate(os.path.dirname(genome), os.path.abspath(genome_rc), os.path.abspath(rel_gbk), contig_id, gen_code, max_contig_size, str(threads_per_contig))
-        #start, strand = rotation.get_phe_pos(new_gb)
+        logging.info(f"Reverse complement generated: {contig_id}_RC.mitogenome.fa")
+        mitogenome_gb = rotation.annotate(os.path.dirname(genome), os.path.abspath(genome_rc), os.path.abspath(rel_gbk), contig_id, gen_code, max_contig_size, str(threads_per_contig))
+        logging.info(f"Annotation of reverse complement done")
         genome = rc
     rotation.rotate(genome, start, contig_id)
-    if new_gb:
-        logging.info(f"{ref_tRNA} is at reverse complement of {contig_id}.mitogenome.fa")
-        logging.info(f"For that reason we have generated a new genbank (reverse complemented): {new_gb}")
     
     rotated_file = os.path.join(os.path.dirname(genome), contig_id + '.mitogenome.rotated.fa')
     logging.info(f"Rotation of {contig_id} done. Rotated is at {rotated_file}") 
-    # check frameshifts in genes from contig and append save findings to 
+    # check frameshifts in genes from contig and save findings to 
     # `{contig_id}.individual.stats` intermediate file
     frameshifts = findFrameShifts.find_frameshifts(mitogenome_gb)
     gb_len, num_genes = findFrameShifts.get_gb_stats(mitogenome_gb)
