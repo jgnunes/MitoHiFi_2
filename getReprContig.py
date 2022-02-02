@@ -5,7 +5,15 @@ import sys #to remove after debugging
 
 
 def get_largest_cluster(cdhit_clstr_file):
-    #clusters = {}
+    """Reads CDHIT cluster file and returns the cluster with highest number of seqs.
+
+    Args:
+        cdhit_clst_file (str): file containing information about CDHIT clusters (*.clstr)
+
+    Returns:
+        tuple: Largest cluster ID, Representative sequence from the largest cluster
+    """
+
     largest_cluster_len = 0
     largest_cluster = ""
     curr_sequences = []
@@ -35,6 +43,16 @@ def get_largest_cluster(cdhit_clstr_file):
     return (largest_cluster, representative_seq)
 
 def get_repr_contig(contigs_fasta, threads="1"):
+    """Gets representative contig from a multifasta file
+
+    Args:
+        contigs_fasta (str): file containing all sequences 
+        threads (str): number of threads to be used when running CDHIT
+
+    Returns:
+        tuple: Representative contig ID, CDHIT cluster where the representative contig came from
+    """
+
     c_threshold = "0.8"
     wordsize = "4"
     cdhit_out = "cdhit.out"

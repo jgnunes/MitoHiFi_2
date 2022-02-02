@@ -177,9 +177,9 @@ def process_contig_02(ref_tRNA, threads_per_contig, circular_size, circular_offs
         genome_rc = contig_id + "_RC.mitogenome.fa"
         rc = os.path.join(os.path.dirname(genome), genome_rc)
         rotation.make_rc(genome, rc)
-        logging.info(f"Reverse complement generated: {contig_id}_RC.mitogenome.fa")
+        logging.info(f"Reverse complement generated: {contig_id}_RC.mitogenome.fa. Starting reverse complement annotation...")
         mitogenome_gb = rotation.annotate(os.path.dirname(genome), os.path.abspath(genome_rc), os.path.abspath(rel_gbk), contig_id, gen_code, max_contig_size, str(threads_per_contig))
-        logging.info(f"Annotation of reverse complement done")
+        logging.info(f"Annotation of reverse complement for contig {contig_id} done")
         genome = rc
     rotation.rotate(genome, start, contig_id)
     
@@ -417,9 +417,6 @@ The pipeline has stopped !! You need to run further scripts to check if you have
     # Set maximum contig size accepted by mitofinder when annotating the contigs
     max_contig_size = 5*rel_mito_len
 
-    # creates a dictionary that will save frameshifts information for each contig
-    contig_shifts = {}
-
     threads_per_contig = 1
     if args.t // len(contigs_ids) > 1:
         threads_per_contig = args.t // len(contigs_ids)
@@ -457,14 +454,17 @@ The pipeline has stopped !! You need to run further scripts to check if you have
                 for line in infile:
                     outfile.write("\t".join([contig_id, line.strip()+"\n"]))
     
-    logging.debug(f"contig_shifts after parallel processing: {contig_shifts}") # for debugging 
+    step += 1
     #align final mitogenome rotated contigs
-    logging.info("Now the final rotated contigs will be aligned")
+    logging.info(f"{step}. Now the rotated contigs will be aligned")
     # list all final rotated contigs 
     contigs_files = []
     for curr_file in os.listdir('.'):
         if curr_file.endswith('mitogenome.rotated.fa'):
             contigs_files.append(curr_file)
+    if not contigs_files:
+        sys.exit("""No rotated contigs found. 
+        An error has possibly occurred during annotation and/or rotation of your contigs""")
     # first concatenate all rotated contigs into a single multifasta file
     logging.info("List of contigs that will be aligned: " + str(contigs_files) + "\n")
     concat_fasta = alignContigs.concatenate_contigs(contigs_files)
@@ -472,18 +472,32 @@ The pipeline has stopped !! You need to run further scripts to check if you have
     alignContigs.mafft_align(multifasta_file=concat_fasta, threads=args.t, clustal_format=True)
     logging.info("Alignment done and saved at ./final_mitogenome_choice/all_mitogenomes.rotated.aligned.fa\n")
 
-    logging.info("Now we will choose the most representative contig" + "\n")
+    try:
+        f = open("all_mitogenomes.rotated.aligned.fa")
+    except FileNotFoundError:
+        sys.exit("""No all_mitogenomes.rotated.aligned.fa file.
+        An error may have occurred when aligning the potential contigs""")
+    finally:
+        f.close()
+
+    step += 1
+    logging.info(f"{step}. Now we will choose the most representative contig" + "\n")
     repr_contig_id, repr_contig_cluster = getReprContig.get_repr_contig("all_mitogenomes.rotated.fa", args.t)
-    logging.info("Representative contig is {} that belongs to {}. This contig will be our final mitogenome. See all contigs and clusters in cdhit.out.clstr".format(repr_contig_id, repr_contig_cluster))
+    logging.info(f"Representative contig is {repr_contig_id} that belongs to {repr_contig_cluster}. This contig will be our final mitogenome. See all contigs and clusters in cdhit.out.clstr")
     
     repr_contig_fasta = repr_contig_id + ".mitogenome.rotated.fa"
-    repr_contig_get_gb = ["mitofinder", "--new-genes", "--max-contig-size", str(max_contig_size), "-j", "final_mitogenome.annotation", "-a", repr_contig_fasta, "-r", args.g, "-o", args.o, "-p", str(args.p)]
+    repr_contig_get_gb = ["mitofinder", "--new-genes", "--max-contig-size",
+                        str(max_contig_size), "-j", "final_mitogenome.annotation",
+                        "-a", repr_contig_fasta, "-r", args.g, "-o", args.o, "-p", str(args.p)]
     subprocess.run(repr_contig_get_gb, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
 
     final_fasta = os.path.join("final_mitogenome.annotation", "final_mitogenome.annotation_MitoFinder_mitfi_Final_Results", "final_mitogenome.annotation_mtDNA_contig.fasta")
     final_gbk = os.path.join("final_mitogenome.annotation", "final_mitogenome.annotation_MitoFinder_mitfi_Final_Results", "final_mitogenome.annotation_mtDNA_contig.gb")
     
     # Generate contigs stats
+    step += 1
+    logging.info(f"""{step}. Calculating final stats for final mitogenome and other potential contigs.
+    Stats will be saved on contigs_stats.tsv file.""")
     ## Print first three lines (comment and header)
     frameshifts = findFrameShifts.find_frameshifts(final_gbk)  
     contig_len, num_genes = findFrameShifts.get_gb_stats(final_gbk)
@@ -494,7 +508,7 @@ The pipeline has stopped !! You need to run further scripts to check if you have
     elif len(frameshifts)>1:
         all_frameshifts = ";".join(frameshifts)
     with open("contigs_stats.tsv", "w") as f: 
-        f.write("# Related mitogenome is {} bp long and has {} genes\n".format(rel_mito_len, rel_mito_num_genes))
+        f.write(f"# Related mitogenome is {rel_mito_len} bp long and has {rel_mito_num_genes} genes\n")
         f.write("\t".join(["contig_id", "frameshifts_found", "genbank_file", "length(bp)", "number_of_genes\n"]))
         f.write("\t".join(["final_mitogenome", all_frameshifts, "final_mitogenome.gb", contig_len, num_genes+"\n"]))
     ## Iterate over each contig and print its info (ID, framshifts and genbank file used 
@@ -508,7 +522,6 @@ The pipeline has stopped !! You need to run further scripts to check if you have
             # same as the final_mitogenome
             if curr_file.split('.')[0] != repr_contig_id: 
                 contigs_stats_files.append(curr_file)
-    logging.debug(f"contigs_stats_files: {contigs_stats_files}") # for debugging
     
     with open("contigs_stats.tsv", "a") as outfile:
         for contig_stats in contigs_stats_files:
@@ -524,7 +537,7 @@ The pipeline has stopped !! You need to run further scripts to check if you have
 
     logging.info("Pipeline finished!" )
     runtime= time.time() - start_time
-    logging.info(f"Run time: {runtime} seconds")
+    logging.info(f"Run time: {runtime:.2f} seconds")
 
 if __name__ == '__main__':
     main()

@@ -9,13 +9,21 @@ from collections import deque
 import itertools
 
 def get_trna_pos(path):
+    """Gets the position for each tRNA in an input file
+
+    Args:
+        path (str): input file to be processed
+
+    Returns:
+        dict: Positions for each tRNA gene found
+    """
+
     trnas = {}
     with open(path) as f:
         for _, record in enumerate(SeqIO.parse(path, "genbank")):
             for trna in record.features:
                 if trna.type == 'gene' and 'product' in trna.qualifiers and \
                     'tRNA' in trna.qualifiers['product'][0]:
-                    #print(trna.qualifiers['product']) #debug
                     tRNA_name = trna.qualifiers['product'][0]
                     tRNA_start = str(int(trna.location.start))
                     tRNA_strand = str(trna.location.strand)
@@ -25,6 +33,15 @@ def get_trna_pos(path):
     return None
 
 def get_phe_pos(path):
+    """Gets the position of the tRNA-Phe gene
+
+    Args:
+        path (str): path of input genbank file
+
+    Returns:
+        tuple: Start position of tRNA-Phe, Strand
+    """
+
     with open(path) as f:
         for _, record in enumerate(SeqIO.parse(path, "genbank")):
             for fea in record.features:
