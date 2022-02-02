@@ -1,48 +1,100 @@
+import logging
 import subprocess
 import numpy
+import warnings
 from Bio import SeqIO
-import sys #to remove after debugging
+import sys #remove after debugging
 
+def get_repr_contig_info(cdhit_clstr_file, rel_mito_len, rel_mito_perc=0.10, debug=False):
+    
+    def get_frameshift_info(seq_id):
+        """Retrieves information of frameshifts from *.individual.stats file
 
-def get_largest_cluster(cdhit_clstr_file):
-    """Reads CDHIT cluster file and returns the cluster with highest number of seqs.
+        Args:
+            seq_id (str): identifier of the target sequence (contig)
 
-    Args:
-        cdhit_clst_file (str): file containing information about CDHIT clusters (*.clstr)
+        Returns:
+            str: information about frameshifts present on target sequence genes
+        """
 
-    Returns:
-        tuple: Largest cluster ID, Representative sequence from the largest cluster
-    """
+        with open(f"{seq_id}.individual.stats", "r") as f: 
+            for line in f:
+                frameshift_info = line.split("\t")[1]
+        return frameshift_info
 
-    largest_cluster_len = 0
-    largest_cluster = ""
-    curr_sequences = []
-    curr_cluster = []
+    FORMAT='[%(asctime)s %(levelname)s] %(message)s'
+    if debug: # If in debug mode
+        logging.basicConfig(level=logging.DEBUG, stream=sys.stdout,
+                            format=FORMAT, datefmt='%Y-%m-%d %H:%M:%S')
+
+    # Set maximum size targeted for the representative contig 
+    # based on the size of the related mitogenome
+    rel_mito_len = int(rel_mito_len)
+    rel_mito_upper_lim = (1+rel_mito_perc)*rel_mito_len
+    logging.debug(f"Maximum size target for repr contig: {rel_mito_upper_lim}")
+
+    # create `seqs` list of lists to hold information (ID, length, frameshifts, cluster)
+    # for each sequence (contig)
+    seqs = []
     with open(cdhit_clstr_file, "r") as f:
         for line in f:
             if line[0] == ">":
-                if len(curr_sequences) > largest_cluster_len:
-                    largest_cluster = curr_cluster
-                    largest_cluster_len = len(curr_sequences)
-                    largest_cluster_seqs = curr_sequences
-                curr_cluster = line.strip().replace(">","")
-                curr_sequences = []
-                #clusters[cluster_id] = 0
+                curr_cluster = line.strip().replace(">", "") # save current cluster ID
             else:
-                curr_sequences.append(line.strip())
-        # catch the last cluster        
-        if len(curr_sequences) > largest_cluster_len:
-            largest_cluster = curr_cluster
-            largest_cluster_len = len(curr_sequences)
-            largest_cluster_seqs = curr_sequences
+                # retrieves the ID from sequences that were reverse complemented (rc)
+                if "_rc_" in line: 
+                    seq_id = line.split()[2].replace(">","").split("_rc_rotated")[0]
+                # retrieves the ID from sequences that were **not** reverse complemented
+                else:
+                    seq_id = line.split()[2].replace(">","").split("_rotated")[0]
+                # retrieves sequence lenght and frameshifts information
+                seq_len = int(line.split()[1].replace("nt,", ""))
+                seq_frameshifts = get_frameshift_info(seq_id)
+                # appends sequence information (as a list) to the `seqs` list
+                seqs.append([seq_id, seq_len, seq_frameshifts, curr_cluster])
+
+    # Sorts (descending order) sequences based on second item of list,
+    # which represents the sequence lengths
+    seqs.sort(key=lambda x: x[1], reverse=True)
+    logging.debug(f"Sorted seqs list: {seqs}")
+
+    # Now we'll define the representative contig
+    repr_contig = ""
+    # First we search if there's any contig for which we have both i) a size less than or equal 
+    # to an upper size limit defined based on the related mito length; and ii) no frameshifts
+    # found
+    for seq in seqs:
+        print(f"{seq[0]} --> seq[2]: {seq[2]}")
+        if seq[1] <= rel_mito_upper_lim and seq[2] == "No frameshift found":
+            repr_contig, repr_contig_cluster = seq[0], seq[3]
+            break
     
-    for sequence in largest_cluster_seqs:
-        if sequence[-1] == "*":
-            representative_seq = sequence
+    # If the first condition is not met, then we search for a contig whose size is less than or
+    # equal to the upper size limit, even though it may have frameshifts         
+    if not repr_contig:
+        for seq in seqs:
+            if seq[1] <= rel_mito_upper_lim:
+                repr_contig, repr_contig_cluster = seq[0], seq[3]
+                warnings.warn("Warning: representative contig contains frameshifts")
+                break
 
-    return (largest_cluster, representative_seq)
+    # If the second condition is not met, we search for a contig which has no frameshifts, 
+    # even though its size is greater than the upper size limit            
+    if not repr_contig:
+        for seq in seqs:
+            if seq[2] == "No frameshift found":
+                repr_contig, repr_contig_cluster = seq[0], seq[3]
+                warnings.warn(f"Warning: representative contig length is {1+rel_mito_perc} greater than related mito")
+                break
 
-def get_repr_contig(contigs_fasta, threads="1"):
+    # If none condition is met, we return the smallest contig available            
+    if not repr_contig:
+        repr_contig, repr_contig_cluster = seqs[-1][0], seqs[-1][3]
+        warnings.warn("Warning: representative contig contains frameshifts and it may be too large")
+
+    return (repr_contig, repr_contig_cluster)   
+
+def get_repr_contig(contigs_fasta, rel_mito_len, threads="1", debug=False):
     """Gets representative contig from a multifasta file
 
     Args:
@@ -60,11 +112,7 @@ def get_repr_contig(contigs_fasta, threads="1"):
     cdhit_cmd = ["cd-hit-est", "-i", contigs_fasta, "-d", "0", "-c", c_threshold, "-n", wordsize, "-o", cdhit_out, "-T", str(threads), "-M", "0"]
     subprocess.run(cdhit_cmd, shell=False, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
 
-    repr_contig_cluster, repr_contig_info = get_largest_cluster(cdhit_out_clstr)
-    if "_rc_" in repr_contig_info:
-        repr_contig_id = repr_contig_info.split()[2].replace(">","").split("_rc_rotated")[0]
-    else:
-        repr_contig_id = repr_contig_info.split()[2].replace(">","").split("_rotated")[0]
+    repr_contig_id, repr_contig_cluster = get_repr_contig_info(cdhit_out_clstr, rel_mito_len, debug)
     return (repr_contig_id, repr_contig_cluster)
 
 if __name__ == "__main__":
