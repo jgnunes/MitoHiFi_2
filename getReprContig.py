@@ -64,7 +64,6 @@ def get_repr_contig_info(cdhit_clstr_file, rel_mito_len, rel_mito_perc=0.10, deb
     # to an upper size limit defined based on the related mito length; and ii) no frameshifts
     # found
     for seq in seqs:
-        print(f"{seq[0]} --> seq[2]: {seq[2]}")
         if seq[1] <= rel_mito_upper_lim and seq[2] == "No frameshift found":
             repr_contig, repr_contig_cluster = seq[0], seq[3]
             break
@@ -84,7 +83,7 @@ def get_repr_contig_info(cdhit_clstr_file, rel_mito_len, rel_mito_perc=0.10, deb
         for seq in seqs:
             if seq[2] == "No frameshift found":
                 repr_contig, repr_contig_cluster = seq[0], seq[3]
-                warnings.warn(f"Warning: representative contig length is {1+rel_mito_perc} greater than related mito")
+                warnings.warn(f"Warning: representative contig length is significantly greater than related mito")
                 break
 
     # If none condition is met, we return the smallest contig available            
