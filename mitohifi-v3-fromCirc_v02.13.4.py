@@ -230,7 +230,7 @@ def main():
     args = parser.parse_args()
     
     # Set log message format
-    FORMAT='[%(asctime)s %(levelname)s] %(message)s'
+    FORMAT='%(asctime)s [%(levelname)s] %(message)s'
 
     if args.d: # If in debug mode
         logging.basicConfig(level=logging.DEBUG, stream=sys.stdout,
