@@ -181,8 +181,20 @@ def process_contig_02(ref_tRNA, threads_per_contig, circular_size, circular_offs
         mitogenome_gb = rotation.annotate(os.path.dirname(genome), os.path.abspath(genome_rc), os.path.abspath(rel_gbk), contig_id, gen_code, max_contig_size, str(threads_per_contig))
         logging.info(f"Annotation of reverse complement for contig {contig_id} done")
         genome = rc
+        if not os.path.isfile(mitogenome_gb):
+            warnings.warn("Contig "+ contig_id + " does not have a reverse complemented annotation file, check MitoFinder's log")
+            return
+
     rotation.rotate(genome, start, contig_id)
     
+    try:
+        f = open(mitogenome_gb)
+    except FileNotFoundError:
+        sys.exit(f"""Annotation file {mitogenome_gb} not found.
+        An error may have occurred when annotating contig {contig_id}. Check MitoFinder""")
+    finally:
+        f.close()
+
     rotated_file = os.path.join(os.path.dirname(genome), contig_id + '.mitogenome.rotated.fa')
     logging.info(f"Rotation of {contig_id} done. Rotated is at {rotated_file}") 
     # check frameshifts in genes from contig and save findings to 
