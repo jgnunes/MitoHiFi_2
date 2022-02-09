@@ -59,6 +59,25 @@ def parse_blast(query_perc=50, min_query_perc=80, max_query_len=5):
     ac[(ac['%q_in_match'] > 0)].sort_values(by='%q_in_match', ascending=False).to_csv("parsed_blast_all.txt", index=False, sep="\t")
     ac[(ac['%q_in_match'] > query_perc)].sort_values(by='%q_in_match', ascending=False).to_csv("parsed_blast.txt", index=False, sep="\t")
 
+def get_contigs_ids(blast_output):
+    """
+    args:
+    blast_line is a blast output, that can be either parsed_blast.txt or parsed_blast_all.txt
+    
+    returns:
+    The ID from each contig from blast_output, i.e., the BLAST queries
+    """
+    contigs_ids = set()
+
+    num_lines = sum(1 for line in open(blast_output, "r") if line.strip()) # counts the number of lines in the input file
+    if num_lines >= 2:
+        with open(blast_output, "r") as f:
+            next(f) # skips blast header
+            for line in f:
+                contigs_ids.add(line.split()[0])    
+
+    return contigs_ids
+
 def main():
     parse_blast()
 

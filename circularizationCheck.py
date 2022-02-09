@@ -77,6 +77,63 @@ def circularizationCheck(resultFile, contig_id, circularSize=220, circularOffSet
 	#no circularization was observed in the for loop, so we exited it, just return false
 	return (False,-1,-1)
 
+def get_circo_mito(contig_id, circular_size, circular_offset):
+    """It takes a contig ID and circularizes it, returning the circularization points.
+
+    Args:
+    	contig_id (str): ID from contig to be circularized
+    	circular_size (int): size to consider when checking for circularization
+    	circular_offset (int): offset from start and finish to consider when looking for circularization
+
+    Returns:
+    	list: circularization history for the input contig
+    """
+    def cut_coords(contig_fasta, circularization_position, fasta_out):
+        #print(f"cut_coords function called!\ncontig_fasta: {contig_fasta}; circularization_position: {circularization_position}; fasta_out: {fasta_out}") # for debugging
+        record=SeqIO.read(contig_fasta, "fasta")
+        id = record.id
+        get= record[circularization_position:]
+        with open(fasta_out, "w") as f:
+            f.write(get.format('fasta'))
+
+    # find circularization point
+    circularization_history = []
+    contig_fasta = "".join([contig_id, ".mito.fa"])
+    mitogenome_fasta_out = "".join([contig_id, ".mitogenome.fa"])
+    circularization_checks = "".join([contig_id, ".circularisationCheck.txt"])
+
+    circularization_info = circularizationCheck(resultFile=contig_fasta, circularSize=circular_size, circularOffSet=circular_offset, contig_id=contig_id)
+
+    # writes circularization information to '[contig_id].circularisationCheck.txt' file
+    with open(circularization_checks, "w") as f:
+        f.write(str(circularization_info))
+        circularization_history.append(str(circularization_info))
+    
+    is_circularizable = circularization_info[0]
+    circularization_position = int(circularization_info[2])
+
+    # if the contig is not circularizable, then create the "mitogenome.fasta" directly from it
+    if not is_circularizable:
+        record=SeqIO.read(contig_fasta, "fasta")
+        id = record.id
+        with open(mitogenome_fasta_out, "w") as f:  
+            f.write(record.format('fasta'))        
+    else:
+        # if the contig is circularizable, then run circularization iteratively until the "mitogenome.fasta"
+        # is no longer circularizable    
+        while is_circularizable:
+            cut_coords(contig_fasta, circularization_position, mitogenome_fasta_out)
+            contig_fasta = mitogenome_fasta_out
+            circularization_info = circularizationCheck(resultFile=contig_fasta, circularSize=circular_size, circularOffSet=circular_offset, contig_id=contig_id)
+            is_circularizable = circularization_info[0]
+            circularization_position = int(circularization_info[2])
+            with open(circularization_checks, "a") as f:
+                f.write("\n" + str(circularization_info))
+                circularization_history.append(str(circularization_info))
+    
+    print(f"circularization_history: {circularization_history}") # for debugging
+    return circularization_history
+
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description='Find circularization points')
 	parser.add_argument('--result-file', type=str, help='Input FASTA file to be processed')

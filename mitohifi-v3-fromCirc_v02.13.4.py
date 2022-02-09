@@ -12,6 +12,7 @@ from Bio import SeqIO
 import sys
 import os
 import cleanUpCWD
+import fetch
 import filterfasta
 import findFrameShifts
 import fixContigHeaders
@@ -19,136 +20,13 @@ import functools
 import rotation
 import getMitoLength
 import getReprContig
+from parallel_annotation import process_contig, process_contig_02
 import shlex
-from circularizationCheck import circularizationCheck
+from circularizationCheck import circularizationCheck, get_circo_mito
 import alignContigs
 
-def get_num_seqs(in_fasta):
-    c = 0
-    for rec in SeqIO.parse(in_fasta, "fasta"):
-        c += 1
-    return c
-
-def get_contigs_ids(blast_output):
-    """
-    args:
-    blast_line is a blast output, that can be either parsed_blast.txt or parsed_blast_all.txt
     
-    returns:
-    The ID from each contig from blast_output, i.e., the BLAST queries
-    """
-    contigs_ids = set()
 
-    num_lines = sum(1 for line in open(blast_output, "r") if line.strip()) # counts the number of lines in the input file
-    if num_lines >= 2:
-        with open(blast_output, "r") as f:
-            next(f) # skips blast header
-            for line in f:
-                contigs_ids.add(line.split()[0])    
-
-    return contigs_ids
-
-def get_circo_mito(contig_id, circular_size, circular_offset):
-    """
-    It gets a contig ID and circularizes it, registering the circularization points
-    args:
-    the ID from the contig that we want to circularize
-    """
-    def cut_coords(contig_fasta, circularization_position, fasta_out):
-        #print(f"cut_coords function called!\ncontig_fasta: {contig_fasta}; circularization_position: {circularization_position}; fasta_out: {fasta_out}") # for debugging
-        record=SeqIO.read(contig_fasta, "fasta")
-        id = record.id
-        get= record[circularization_position:]
-        with open(fasta_out, "w") as f:
-            f.write(get.format('fasta'))
-
-    # find circularization point
-    circularization_history = []
-    contig_fasta = "".join([contig_id, ".mito.fa"])
-    mitogenome_fasta_out = "".join([contig_id, ".mitogenome.fa"])
-    circularization_checks = "".join([contig_id, ".circularisationCheck.txt"])
-
-    circularization_info = circularizationCheck(resultFile=contig_fasta, circularSize=circular_size, circularOffSet=circular_offset, contig_id=contig_id)
-
-    # writes circularization information to '[contig_id].circularisationCheck.txt' file
-    with open(circularization_checks, "w") as f:
-        f.write(str(circularization_info))
-        circularization_history.append(str(circularization_info))
-    
-    is_circularizable = circularization_info[0]
-    circularization_position = int(circularization_info[2])
-
-    # if the contig is not circularizable, then create the "mitogenome.fasta" directly from it
-    if not is_circularizable:
-        record=SeqIO.read(contig_fasta, "fasta")
-        id = record.id
-        with open(mitogenome_fasta_out, "w") as f:  
-            f.write(record.format('fasta'))        
-    else:
-        # if the contig is circularizable, then run circularization iteratively until the "mitogenome.fasta"
-        # is no longer circularizable    
-        while is_circularizable:
-            cut_coords(contig_fasta, circularization_position, mitogenome_fasta_out)
-            contig_fasta = mitogenome_fasta_out
-            circularization_info = circularizationCheck(resultFile=contig_fasta, circularSize=circular_size, circularOffSet=circular_offset, contig_id=contig_id)
-            is_circularizable = circularization_info[0]
-            circularization_position = int(circularization_info[2])
-            with open(circularization_checks, "a") as f:
-                f.write("\n" + str(circularization_info))
-                circularization_history.append(str(circularization_info))
-    
-    print(f"circularization_history: {circularization_history}") # for debugging
-    return circularization_history
-
-def get_ref_tRNA():
-    tRNAs = {}
-    for curr_file in os.listdir('.'):
-        if curr_file.endswith('.trnas'):
-            with open(curr_file, "r") as infile:
-                for line in infile:
-                    tRNA = line.split("\t")[0]
-                    if tRNA not in tRNAs:
-                        tRNAs[tRNA] = 1
-                    else:
-                        tRNAs[tRNA] += 1
-    #print(f"tRNAS: {tRNAs}") #debug
-    # if any contig has a tRNA-Phe, use it as the reference gene for rotation
-    if 'tRNA-Phe' in tRNAs:
-        reference_tRNA = 'tRNA-Phe'
-    else:
-        reference_tRNA = max(tRNAs, key=tRNAs.get)
-    return reference_tRNA
-    
-def process_contig(threads_per_contig, circular_size, circular_offset, contigs, max_contig_size, rel_gbk, gen_code, contig_id): 
-    logging.info(f"Working with contig {contig_id}") 
-    # retrieves the FASTA files for each contig
-    filterfasta.filterFasta(idList=[contig_id], inStream=contigs, outPath="".join([contig_id, ".mito.fa"]), log=False)
-    # circularizes each contig and saves circularization history to a file
-    logging.info(f"Started {contig_id} circularization")
-    circularization_history = get_circo_mito(contig_id, circular_size, circular_offset)
-    logging.info(f"{contig_id} circularization done. Circularization info saved on ./potential_contigs/{contig_id}/{contig_id}.circularisationCheck.txt")
-    # annotates mitogenome(s) using mitofinder
-    logging.info(f"Started {contig_id} (MitoFinder) annotation")
-    mitofinder_cmd = ["mitofinder", "--new-genes", "--max-contig-size", str(max_contig_size),
-                    "-j", contig_id+".annotation", "-a", contig_id+".mitogenome.fa",
-                    "-r", rel_gbk, "-o", gen_code, "-p", str(threads_per_contig)] 
-    subprocess.run(mitofinder_cmd, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
-    logging.info(f"{contig_id} annotation done. Annotation log saved on ./potential_contigs/{contig_id}/{contig_id}.annotation_MitoFinder.log")
-    # rotates the mitogenome
-    mitogenome_gb = os.path.join(contig_id + ".annotation", contig_id + ".annotation_MitoFinder_mitfi_Final_Results", contig_id + ".annotation_mtDNA_contig.gb") 
-    if not os.path.isfile(mitogenome_gb):
-        warnings.warn("Contig "+ contig_id + " does not have an annotation file, check MitoFinder's log")
-        return
-    
-    trnas = rotation.get_trna_pos(mitogenome_gb)
-    if trnas:
-        with open(f"{contig_id}.trnas", "w") as outfile:
-            for trna in trnas:
-                outfile.write("\t".join([trna, trnas[trna][0], trnas[trna][1], "\n"]))
-        return
-    else:
-        warnings.warn(f"No tRNA gene found in {mitogenome_gb}... Skipping contig {contig_id}")
-        return
 
 
 def process_contig_02(ref_tRNA, threads_per_contig, circular_size, circular_offset, contigs, max_contig_size, rel_gbk, gen_code, contig_id): 
@@ -288,7 +166,7 @@ def main():
         logging.info(" ".join(bam2fasta_cmd) + " > gbk.HiFiMapped.bam.fasta")
         mapped_fasta_f = open("gbk.HiFiMapped.bam.fasta", "w")
         subprocess.run(bam2fasta_cmd, stdout=mapped_fasta_f, stderr=subprocess.DEVNULL)
-        before_filter = get_num_seqs("gbk.HiFiMapped.bam.fasta")
+        before_filter = fetch.get_num_seqs("gbk.HiFiMapped.bam.fasta")
         logging.info(f"Total number of mapped reads: {before_filter}")
 
         logging.info(f"2.2 Then we filter reads that are larger than {rel_mito_len} bp")
@@ -303,7 +181,7 @@ def main():
         finally:
             f.close()
 
-        after_filter = get_num_seqs("gbk.HiFiMapped.bam.filtered.fasta")
+        after_filter = fetch.get_num_seqs("gbk.HiFiMapped.bam.filtered.fasta")
         logging.info(f"Number of filtered reads: {after_filter}")
 
         logging.info("3. Now let's run hifiasm to assemble the mapped and filtered reads!")
@@ -397,12 +275,12 @@ def main():
 
     # select contigs to be circularized
     # first look for contigs in parsed_blast.txt
-    contigs_ids = get_contigs_ids("parsed_blast.txt")
+    contigs_ids = parse_blast.get_contigs_ids("parsed_blast.txt")
 
     # if we don't find contigs in parse_blast.txt 
     # look for contigs in parsed_blast_all.txt
     if len(contigs_ids) == 0:
-        contigs_ids = get_contigs_ids("parsed_blast_all.txt")
+        contigs_ids = parse_blast.get_contigs_ids("parsed_blast_all.txt")
 
     # if we can't find any contigs even in parsed_blast_all.txt, then we exit the pipeline
     if len(contigs_ids) == 0:
@@ -442,7 +320,7 @@ The pipeline has stopped !! You need to run further scripts to check if you have
     with concurrent.futures.ProcessPoolExecutor() as executor:
         executor.map(partial_process_contig, contigs_ids)
     
-    tRNA_ref = get_ref_tRNA() 
+    tRNA_ref = fetch.get_ref_tRNA() 
     logging.debug(f"tRNA to be used as reference for rotation: {tRNA_ref}") 
     
     partial_process_contig_02 = functools.partial(process_contig_02, tRNA_ref,
