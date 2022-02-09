@@ -1,4 +1,5 @@
 from Bio import SeqIO
+import os 
 
 def get_num_seqs(in_fasta):
     """Gets the number of sequences in a FASTA file.
