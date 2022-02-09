@@ -1,14 +1,14 @@
+import os
 import concurrent.futures
 import sys
 import functools
 import subprocess
-import getMitoLength 
-
-def annotate_mito(max_contig_size, related_gbk, gen_code, contig_id):
-    #mitofinder = ["/software/team311/jf18/MitoFinder/mitofinder", "--max-contig-size", str(max_contig_size), "-j", contig_id + ".annotation", "-a", contig_id + ".mitogenome.fa", "-r", related_gbk, "-o", gen_code, "-p", str(threads)]
-    print(f"Annotating contig {contig_id}...")
-    mitofinder = ["mitofinder", "--max-contig-size", str(max_contig_size), "-j", contig_id + ".annotation", "-a", contig_id + ".mitogenome.fa", "-r", related_gbk, "-o", gen_code, "-p", "1"]
-    subprocess.run(mitofinder)
+import getMitoLength
+import logging
+import warnings 
+import rotation
+from circularizationCheck import get_circo_mito
+import findFrameShifts
 
 def process_contig(threads_per_contig, circular_size, circular_offset, contigs, max_contig_size, rel_gbk, gen_code, contig_id): 
     """Circularize and annotate a contig.

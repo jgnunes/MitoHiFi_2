@@ -131,7 +131,6 @@ def get_circo_mito(contig_id, circular_size, circular_offset):
                 f.write("\n" + str(circularization_info))
                 circularization_history.append(str(circularization_info))
     
-    print(f"circularization_history: {circularization_history}") # for debugging
     return circularization_history
 
 if __name__ == '__main__':
