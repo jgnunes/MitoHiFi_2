@@ -9,6 +9,7 @@ import warnings
 import rotation
 from circularizationCheck import get_circo_mito
 import findFrameShifts
+import filterfasta
 
 def process_contig(threads_per_contig, circular_size, circular_offset, contigs, max_contig_size, rel_gbk, gen_code, contig_id): 
     """Circularize and annotate a contig.
