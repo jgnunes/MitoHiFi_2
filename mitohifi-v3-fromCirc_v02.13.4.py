@@ -122,9 +122,8 @@ def main():
 
         logging.info("3. Now let's run hifiasm to assemble the mapped and filtered reads!")
         
-        # needs to update using the primary flag for newer Hifiasm versions
-        hifiasm_cmd = ["hifiasm", "-t", str(args.t), "-f", str(args.m), "-o",
-                    "gbk.HiFiMapped.bam.filtered.assembled",
+        hifiasm_cmd = ["hifiasm", "--primary", "-t", str(args.t), "-f", str(args.m), 
+                    "-o", "gbk.HiFiMapped.bam.filtered.assembled",
                     "gbk.HiFiMapped.bam.filtered.fasta"]
 
         logging.info(" ".join(hifiasm_cmd))
