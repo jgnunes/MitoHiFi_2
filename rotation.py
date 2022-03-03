@@ -75,7 +75,8 @@ def annotate(workdir, path, ref_gb, contig_id, o_code, max_contig_size, threads)
         os.chdir(workdir)
     command = "mitofinder --max-contig-size {} -j {} -a {} -r {} -o {} -p {}".format(max_contig_size, out_id, path, ref_gb, o_code, threads) 
     mitofinder_cmd = ["mitofinder", "--new-genes", "--max-contig-size", str(max_contig_size),
-                    "-j", out_id, "-a", path, "-r", ref_gb, "-o", o_code, "-p", str(threads)] 
+                    "-j", out_id, "-a", path, "-r", ref_gb, "-o", o_code, "-p", str(threads),
+                    "--circular-size", "8000"] 
     subprocess.run(mitofinder_cmd, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
     os.chdir(cur)
     return os.path.join(workdir, out_id, \
