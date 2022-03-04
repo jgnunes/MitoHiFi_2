@@ -31,7 +31,7 @@ def main():
     __version__ = '2.14.1'
     start_time = time.time()
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(prog='MitoHiFi')
     parser._action_groups.pop()
     required = parser.add_argument_group('required arguments')
     optional = parser.add_argument_group('optional arguments')
@@ -41,14 +41,13 @@ def main():
     required.add_argument("-f", help= "-f: Close-related Mitogenome is fasta format", required = "True", metavar='<relatedMito>.fasta')
     required.add_argument("-g", help= "-k: Close-related species Mitogenome in genebank format", required = "True", metavar='<relatedMito>.gbk')
     required.add_argument("-t", help= "-t: Number of threads for (i) hifiasm and (ii) the blast search", required = "True", type=int, metavar='<THREADS>')    
-    #optional.add_argument("-h", "--help", action="help", default=argparse.SUPPRESS, help= "Print this help message.")
     optional.add_argument("-d", help="-d: debug mode to output additional info on log", action="store_true")    
     optional.add_argument("-a", help="-a: Choose between animal (default) or plant", default="animal", choices=["animal", "plant"])
     optional.add_argument("-p", help="-p: Percentage of query in the blast match with close-related mito", type=int, default=50, metavar='<PERC>')
     optional.add_argument("-m", help="-m: Number of bits for HiFiasm bloom filter [it maps to -f in HiFiasm] (default = 0)", type=int, default=0, metavar='<BLOOM FILTER>')
     optional.add_argument('--circular-size', help='Size to consider when checking for circularization', type=int, default=220)
     optional.add_argument('--circular-offset', help='Offset from start and finish to consider when looking for circularization', type=int, default=40)
-    optional.add_argument('-v', '--version', action='version', version='%(prog)s ("+__version__+")')
+    optional.add_argument('-v', '--version', action='version', version='%(prog)s ' + __version__)
     optional.add_argument("-o", help="""-o: Organism genetic code following NCBI table (for mitogenome annotation):
     1. The Standard Code 2. The Vertebrate MitochondrialCode 3. The Yeast Mitochondrial Code 
     4. The Mold,Protozoan, and Coelenterate Mitochondrial Code and the Mycoplasma/Spiroplasma Code 5. The Invertebrate Mitochondrial Code 
