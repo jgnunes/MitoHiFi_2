@@ -7,6 +7,23 @@ import sys #remove after debugging
 
 def get_repr_contig_info(cdhit_clstr_file, rel_mito_len, rel_mito_perc=0.10, debug=False):
     
+    def get_circularization_info(seq_id):
+        """Retrieves information if contig was circularized
+        
+        Args:
+            seq_id (str): identifier of the target sequence (contig)
+
+        Returns: 
+            bool: returns True if contig was circularized and False otherwise
+        """
+
+        with open(f"{seq_id}.circularisationCheck.txt", "r") as f:
+            for line in f:
+                if line == "(False, -1, -1)":
+                    return False
+                else
+                    return True
+
     def get_frameshift_info(seq_id):
         """Retrieves information of frameshifts from *.individual.stats file
 
@@ -50,8 +67,9 @@ def get_repr_contig_info(cdhit_clstr_file, rel_mito_len, rel_mito_perc=0.10, deb
                 # retrieves sequence lenght and frameshifts information
                 seq_len = int(line.split()[1].replace("nt,", ""))
                 seq_frameshifts = get_frameshift_info(seq_id)
+                seq_circ = get_circularization_info(seq_id)
                 # appends sequence information (as a list) to the `seqs` list
-                seqs.append([seq_id, seq_len, seq_frameshifts, curr_cluster])
+                seqs.append([seq_id, seq_len, seq_frameshifts, curr_cluster, seq_circ])
 
     # Sorts (descending order) sequences based on second item of list,
     # which represents the sequence lengths
