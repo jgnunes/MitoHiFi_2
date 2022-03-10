@@ -21,7 +21,7 @@ def get_repr_contig_info(cdhit_clstr_file, rel_mito_len, rel_mito_perc=0.10, deb
             for line in f:
                 if line == "(False, -1, -1)":
                     return False
-                else
+                else:
                     return True
 
     def get_frameshift_info(seq_id):
