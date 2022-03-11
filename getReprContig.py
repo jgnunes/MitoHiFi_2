@@ -5,25 +5,25 @@ import warnings
 from Bio import SeqIO
 import sys #remove after debugging
 
+def get_circularization_info(seq_id):
+    """Retrieves information if contig was circularized
+    
+    Args:
+        seq_id (str): identifier of the target sequence (contig)
+
+    Returns: 
+        bool: returns True if contig was circularized and False otherwise
+    """
+
+    with open(f"{seq_id}.circularisationCheck.txt", "r") as f:
+        for line in f:
+            if line == "(False, -1, -1)":
+                return False
+            else:
+                return True
+
 def get_repr_contig_info(cdhit_clstr_file, rel_mito_len, rel_mito_perc=0.10, debug=False):
     
-    def get_circularization_info(seq_id):
-        """Retrieves information if contig was circularized
-        
-        Args:
-            seq_id (str): identifier of the target sequence (contig)
-
-        Returns: 
-            bool: returns True if contig was circularized and False otherwise
-        """
-
-        with open(f"{seq_id}.circularisationCheck.txt", "r") as f:
-            for line in f:
-                if line == "(False, -1, -1)":
-                    return False
-                else:
-                    return True
-
     def get_frameshift_info(seq_id):
         """Retrieves information of frameshifts from *.individual.stats file
 
