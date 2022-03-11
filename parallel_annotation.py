@@ -8,7 +8,6 @@ import logging
 import warnings 
 import rotation
 from circularizationCheck import get_circo_mito
-from getReprContig import get_circularization_info
 import findFrameShifts
 import filterfasta
 
@@ -127,7 +126,6 @@ def process_contig_02(ref_tRNA, threads_per_contig, circular_size, circular_offs
     gb_len, num_genes = findFrameShifts.get_gb_stats(mitogenome_gb)
     contig_dir = os.path.join("potential_contigs", contig_id)
     mitogenome_location = os.path.join(contig_dir, mitogenome_gb)
-    is_circ = get_circularization_info(contig_id)
     if not frameshifts:
         all_frameshifts = "No frameshift found"
     elif len(frameshifts)==1:
@@ -135,7 +133,7 @@ def process_contig_02(ref_tRNA, threads_per_contig, circular_size, circular_offs
     elif len(frameshifts)>1:
         all_frameshifts = ";".join(frameshifts)
     with open(f"{contig_id}.individual.stats", "w") as outfile:
-        outfile.write("\t".join([contig_id, all_frameshifts, mitogenome_location, gb_len, num_genes, is_circ+"\n"]))
+        outfile.write("\t".join([contig_id, all_frameshifts, mitogenome_location, gb_len, num_genes+"\n"]))
 
 if __name__ == "__main__":
     
