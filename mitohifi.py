@@ -28,7 +28,7 @@ import alignContigs
 
 def main():
     
-    __version__ = '2.14.1'
+    __version__ = '2.14.2'
     start_time = time.time()
 
     parser = argparse.ArgumentParser(prog='MitoHiFi')
@@ -331,6 +331,7 @@ The pipeline has stopped !! You need to run further scripts to check if you have
     ## Print first three lines (comment and header)
     frameshifts = findFrameShifts.find_frameshifts(final_gbk)  
     contig_len, num_genes = findFrameShifts.get_gb_stats(final_gbk)
+    is_circ = getReprContig.get_circularization_info(repr_contig_id)
     if not frameshifts:
         all_frameshifts = "No frameshift found"
     elif len(frameshifts)==1:
@@ -339,8 +340,10 @@ The pipeline has stopped !! You need to run further scripts to check if you have
         all_frameshifts = ";".join(frameshifts)
     with open("contigs_stats.tsv", "w") as f: 
         f.write(f"# Related mitogenome is {rel_mito_len} bp long and has {rel_mito_num_genes} genes\n")
-        f.write("\t".join(["contig_id", "frameshifts_found", "genbank_file", "length(bp)", "number_of_genes\n"]))
-        f.write("\t".join(["final_mitogenome", all_frameshifts, "final_mitogenome.gb", contig_len, num_genes+"\n"]))
+        f.write("\t".join(["contig_id", "frameshifts_found", "genbank_file", 
+        "length(bp)", "number_of_genes", "was_circular\n"]))
+        f.write("\t".join(["final_mitogenome", all_frameshifts, "final_mitogenome.gb",
+        contig_len, num_genes, str(is_circ)+"\n"]))
     ## Iterate over each contig and print its info (ID, framshifts and genbank file used 
     ## to search for the frameshifts)
     

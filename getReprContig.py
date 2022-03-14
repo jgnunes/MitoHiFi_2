@@ -5,6 +5,23 @@ import warnings
 from Bio import SeqIO
 import sys #remove after debugging
 
+def get_circularization_info(seq_id):
+    """Retrieves information if contig was circularized
+    
+    Args:
+        seq_id (str): identifier of the target sequence (contig)
+
+    Returns: 
+        bool: returns True if contig was circularized and False otherwise
+    """
+
+    with open(f"{seq_id}.circularisationCheck.txt", "r") as f:
+        for line in f:
+            if line == "(False, -1, -1)":
+                return False
+            else:
+                return True
+
 def get_repr_contig_info(cdhit_clstr_file, rel_mito_len, rel_mito_perc=0.10, debug=False):
     
     def get_frameshift_info(seq_id):
@@ -50,8 +67,9 @@ def get_repr_contig_info(cdhit_clstr_file, rel_mito_len, rel_mito_perc=0.10, deb
                 # retrieves sequence lenght and frameshifts information
                 seq_len = int(line.split()[1].replace("nt,", ""))
                 seq_frameshifts = get_frameshift_info(seq_id)
+                seq_circ = get_circularization_info(seq_id)
                 # appends sequence information (as a list) to the `seqs` list
-                seqs.append([seq_id, seq_len, seq_frameshifts, curr_cluster])
+                seqs.append([seq_id, seq_len, seq_frameshifts, curr_cluster, seq_circ])
 
     # Sorts (descending order) sequences based on second item of list,
     # which represents the sequence lengths
@@ -61,35 +79,70 @@ def get_repr_contig_info(cdhit_clstr_file, rel_mito_len, rel_mito_perc=0.10, deb
     # Now we'll define the representative contig
     repr_contig = ""
     # First we search if there's any contig for which we have both i) a size less than or equal 
-    # to an upper size limit defined based on the related mito length; and ii) no frameshifts
-    # found
+    # to an upper size limit defined based on the related mito length; ii) no frameshifts
+    # found; and iii) that was detected as circularized by `circularizationCheck.py` and then
+    # had the duplicated end removed
     for seq in seqs:
-        if seq[1] <= rel_mito_upper_lim and seq[2] == "No frameshift found":
+        if seq[1] <= rel_mito_upper_lim and seq[2] == "No frameshift found" and seq[4] == True:
             repr_contig, repr_contig_cluster = seq[0], seq[3]
             break
     
     # If the first condition is not met, then we search for a contig whose size is less than or
-    # equal to the upper size limit, even though it may have frameshifts         
+    # equal to the upper size limit and it was circularized        
     if not repr_contig:
         for seq in seqs:
-            if seq[1] <= rel_mito_upper_lim:
+            if seq[1] <= rel_mito_upper_lim and seq[4] == True:
                 repr_contig, repr_contig_cluster = seq[0], seq[3]
                 warnings.warn("Warning: representative contig contains frameshifts")
                 break
 
-    # If the second condition is not met, we search for a contig which has no frameshifts, 
-    # even though its size is greater than the upper size limit            
+    # If the second condition is not met, then we search for a contig whose size is less than or
+    # equal to the upper size limit and it has no frameshifts        
+    if not repr_contig:
+        for seq in seqs:
+            if seq[1] <= rel_mito_upper_lim and seq[2] == "No frameshift found":
+                repr_contig, repr_contig_cluster = seq[0], seq[3]
+                warnings.warn("Warning: representative contig wasn't circularized")
+                break
+
+    # If the third condition is not met, then we search for a contig which has no frameshifts and
+    # it was circularized        
+    if not repr_contig:
+        for seq in seqs:
+            if seq[2] == "No frameshift found" and seq[4] == True:
+                repr_contig, repr_contig_cluster = seq[0], seq[3]
+                warnings.warn("Warning: representative contig may be too large")
+                break
+
+    # If the fourth condition is not met, then we search for a contig whose size is less than or
+    # equal to the upper size            
+    if not repr_contig:
+        for seq in seqs:
+            if seq[1] <= rel_mito_upper_lim:
+                repr_contig, repr_contig_cluster = seq[0], seq[3]
+                warnings.warn(f"Warning: representative wasn't circularized and it has frameshifts")
+                break
+
+    # If the fifth condition is not met, then we search for a contig which was circularized            
+    if not repr_contig:
+        for seq in seqs:
+            if seq[4] == True:
+                repr_contig, repr_contig_cluster = seq[0], seq[3]
+                warnings.warn(f"Warning: representative has frameshifts and it may be too large")
+                break
+
+    # If the sixtieth condition is not met, then we search for a contig which has no frameshifts            
     if not repr_contig:
         for seq in seqs:
             if seq[2] == "No frameshift found":
                 repr_contig, repr_contig_cluster = seq[0], seq[3]
-                warnings.warn(f"Warning: representative contig length is significantly greater than related mito")
+                warnings.warn(f"Warning: representative wasn't circularized and it may be too large")
                 break
 
     # If none condition is met, we return the smallest contig available            
     if not repr_contig:
         repr_contig, repr_contig_cluster = seqs[-1][0], seqs[-1][3]
-        warnings.warn("Warning: representative contig contains frameshifts and it may be too large")
+        warnings.warn("Warning: representative contig contains frameshifts, wasn't circularized and it may be too large")
 
     return (repr_contig, repr_contig_cluster)   
 
