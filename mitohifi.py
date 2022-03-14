@@ -28,7 +28,7 @@ import alignContigs
 
 def main():
     
-    __version__ = '2.14.1'
+    __version__ = '2.14.2'
     start_time = time.time()
 
     parser = argparse.ArgumentParser(prog='MitoHiFi')
