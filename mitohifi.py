@@ -343,7 +343,7 @@ The pipeline has stopped !! You need to run further scripts to check if you have
         f.write("\t".join(["contig_id", "frameshifts_found", "genbank_file", 
         "length(bp)", "number_of_genes", "was_circular\n"]))
         f.write("\t".join(["final_mitogenome", all_frameshifts, "final_mitogenome.gb",
-        contig_len, num_genes, is_circ+"\n"]))
+        contig_len, num_genes, str(is_circ)+"\n"]))
     ## Iterate over each contig and print its info (ID, framshifts and genbank file used 
     ## to search for the frameshifts)
     

@@ -135,7 +135,7 @@ def process_contig_02(ref_tRNA, threads_per_contig, circular_size, circular_offs
     elif len(frameshifts)>1:
         all_frameshifts = ";".join(frameshifts)
     with open(f"{contig_id}.individual.stats", "w") as outfile:
-        outfile.write("\t".join([contig_id, all_frameshifts, mitogenome_location, gb_len, num_genes, is_circ+"\n"]))
+        outfile.write("\t".join([contig_id, all_frameshifts, mitogenome_location, gb_len, num_genes, str(is_circ)+"\n"]))
 
 if __name__ == "__main__":
     
