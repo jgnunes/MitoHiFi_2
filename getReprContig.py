@@ -22,7 +22,7 @@ def get_circularization_info(seq_id):
             else:
                 return True
 
-def get_repr_contig_info(cdhit_clstr_file, rel_mito_len, rel_mito_perc=0.10, debug=False):
+def get_repr_contig_info(cdhit_clstr_file, rel_mito_len, rel_mito_perc=0.35, debug=False):
     
     def get_frameshift_info(seq_id):
         """Retrieves information of frameshifts from *.individual.stats file
