@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import subprocess
 import os
 import shutil
+import shlex
+import logging
 
 def make_genome_file(in_fasta):
     
@@ -64,7 +66,8 @@ def plot_coverage(depth_file, winSize):
   
   fig, ax = plt.subplots(1,1)
   ax.bar(x=df2['position'], height=df2['depth'], width=winSize)
-  ax.set_title("Coverage over final_mitogenome.fasta")
+  ax.set_xlabel('Genome position (bp)')
+  ax.set_ylabel('Coverage depth')
 
   plt.savefig("final_mitogenome.coverage.png")
 
@@ -77,89 +80,32 @@ def main():
     mutually_exclusive_group = optional.add_mutually_exclusive_group(required=False)
     mutually_exclusive_group.add_argument('--maxNumSeqs', help='Maximum number of sequences')
     mutually_exclusive_group.add_argument('--seqs', help='List of sequences to be used')
-    required.add_argument('--bam', help='BAM mapping file')
-    optional.add_argument('--winSize', help='Windows size', default=10000, type=int)
-    optional.add_argument('--img', help='List of images to concatenate')
-    optional.add_argument('--depth', help='Depth file to use as input for generating plot')
-    optional.add_argument('--covLim', help='Coverage limit to be displayed at the y axis', type=int)
-    optional.add_argument('--finalFasta', help='final fasta genome file with unique sequence')
+    required.add_argument('-ref', help='Reference file in FASTA format')
+    required.add_argument('-reads', help='Reads file(s) in FASTQ format (accepts .gz compressed file)')
+    optional.add_argument('-winSize', help='Windows size', default=300, type=int)
+    optional.add_argument('-t', help='number of threads to use', default=1, type=int)
+    
     args = parser.parse_args()
-    
-    if args.finalFasta:
-        make_genome_file(args.finalFasta)
-        exit(0)
 
-    if args.bam:
-        in_bam = args.bam
-        
-        start = time.time()
-        print("Getting length information from genome sequences", flush=True)
-        seqs_info = get_all_seqs(in_bam)
-        if args.maxNumSeqs:
-            seqs_info_sliced = sort_sequences(seqs_info, args.maxNumSeqs)
-        elif args.seqs:
-            seqs_info_sliced = retrieve_sequences(seqs_info, args.seqs)
-        else:
-            seqs_info_sliced = sort_sequences(seqs_info, len(seqs_info))
-        end = time.time()
-        elapsed_time = end - start
-        print(f"Elapsed time: {elapsed_time}", flush=True)
-        
-        seqs_plots = []
-        for index, row in seqs_info_sliced.iterrows():
-          seq_ID, seq_len = row['seq_ID'], str(row['seq_len'])
-          # create genome file
-          start = time.time()
-          print(f"Creating genome file for {seq_ID}", flush=True)
-          genome_filename = f"{seq_ID}.genome.txt"
-          with open(genome_filename, "w") as f:
-            f.write("\t".join([seq_ID, seq_len]))
-          end = time.time()
-          elapsed_time = end - start
-          print(f"Elapsed time: {elapsed_time}", flush=True)
-          
-          # create windows file
-          start = time.time()
-          print(f"Creating genome windows file for {seq_ID}", flush=True)
-          windows_filename = make_genome_windows(genome_filename, args.winSize)
-          end = time.time()
-          elapsed_time = end - start
-          print(f"Elapsed time: {elapsed_time}", flush=True)
-          
-          # calculate mean depth per windows
-          start = time.time()
-          print(f"Calculating mean depth per windows for {seq_ID}", flush=True)
-          depth_per_windows = get_windows_depth(windows_filename, in_bam, seq_ID)
-          end = time.time()
-          elapsed_time = end - start
-          print(f"Elapsed time: {elapsed_time}", flush=True)
-          
-          # creating plot for sequence
-          start = time.time()
-          print(f"Creating coverage plot for {seq_ID}", flush=True)
-          out_plot_filename = f"{seq_ID}.coverage.png"
-          seqs_plots.append(out_plot_filename)
-          if args.covLim:
-              plot_coverage(depth_per_windows, out_plot_filename, seq_ID, args.winSize, args.covLim)
-          else:
-              plot_coverage(depth_per_windows, out_plot_filename, seq_ID, args.winSize)
-          end = time.time()
-          elapsed_time = end - start
-          print(f"Elapsed time: {elapsed_time}", flush=True)
-        
-        print(f"seqs_plots: {seqs_plots}", flush=True)
-        print("Concatenating sequences coverages plots into final.coverage.png", flush=True)
-        merge_images(seqs_plots, "final.coverage.png")
-    
-    if args.depth:
-        depth_filename = args.depth
-        out_filename = f"{depth_filename}.png"
-        plot_coverage(depth_filename, out_filename, "coverage plot", args.winSize)
+    # mapping reads to reference
+    out_map_file = f"{args.ref}.hifiMapped.bam"
+    minimap_cmd = ["minimap2", "-t", str(args.t), "--secondary=no", "-ax", "map-pb", args.ref] + shlex.split(args.reads) 
+    samtools_cmd = ["samtools", "view", "-@", str(args.t), "-S", "-b", "-F4", "-F", "0x800"] 
+    logging.info("1. Mapping HiFi reads against final_mitogenome.fasta:")
+    logging.info(" ".join(minimap_cmd) + " | " + " ".join(samtools_cmd) + f" > {out_map_file}")        
+    minimap = subprocess.Popen(minimap_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    mapped_reads_f = open(out_map_file, "w")
+    subprocess.run(samtools_cmd, stderr=subprocess.STDOUT, stdin=minimap.stdout, stdout=mapped_reads_f)
+    minimap.wait()
+    minimap.stdout.close()
 
-    if args.img:
-        images = args.img.split()
-        print("Concatenating images into final.coverage.png", flush=True)
-        merge_images(images, "final.coverage.png")
-   
+
+    # creating coverage plot
+    logging.info("2. Creating windows file...")
+    genome_filename = make_genome_file(args.ref) 
+    genome_windows_filename = make_genome_windows(genome_filename, args.winSize)
+    windows_depth_filename = get_windows_depth(genome_windows_filename, out_map_file) 
+    plot_coverage(windows_depth_filename, args.winSize)
+
 if __name__ == "__main__":
     main()    
