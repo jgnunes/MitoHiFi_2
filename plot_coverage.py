@@ -43,17 +43,13 @@ def get_windows_depth(windows_file, bam_file):
 
     return windows_depth_filename
 
-def plot_coverage(depth_file, winSize, ylim=None):
+def plot_coverage(depth_file, winSize):
 
   df = pd.read_csv(depth_file, sep="\t", names=['sequence', 'start', 'end', 'depth'])  
   df1 = df.astype({'start': 'int', 'end': 'int', 'depth': 'float'})
 
   df1['position'] = df1['start'] + (df1['end'] - df1['start'])/2
   df2 = df1.astype({'position': 'object'})
-  
-  if not ylim:
-      # set coverage limit as the 90% quantile
-      ylim = df2['depth'].quantile(0.9)
   
   fig, ax = plt.subplots(1,1)
   ax.bar(x=df2['position'], height=df2['depth'], width=winSize)
