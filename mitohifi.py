@@ -388,7 +388,7 @@ The pipeline has stopped !! You need to run further scripts to check if you have
         genome_windows_filename = plot_coverage.make_genome_windows(genome_filename, args.winSize)
         windows_depth_filename = plot_coverage.get_windows_depth(genome_windows_filename, "HiFi-vs-final_mitogenome.bam")
         plot_coverage.plot_coverage(windows_depth_filename, args.winSize)
-
+        plot_coverage.move_intermediate_files(["HiFi-vs-final_mitogenome.bam", genome_filename, genome_windows_filename, windows_depth_filename])
 
     # cleaning up working directory 
     cleanUpCWD.clean_up_work_dir(contigs_ids)

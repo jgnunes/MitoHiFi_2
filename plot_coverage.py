@@ -4,6 +4,8 @@ import argparse
 import pandas as pd
 import matplotlib.pyplot as plt
 import subprocess
+import os
+import shutil
 
 def make_genome_file(in_fasta):
     
@@ -43,6 +45,15 @@ def get_windows_depth(windows_file, bam_file):
 
     return windows_depth_filename
 
+def move_intermediate_files(files_list):
+    
+    if not os.path.isdir('final_mitogenome_coverage'):
+        os.mkdir('final_mitogenome_coverage')
+    
+    for f in files_list:
+        shutil.move(f, os.path.join(os.getcwd(), "final_mitogenome_coverage"))
+        
+
 def plot_coverage(depth_file, winSize):
 
   df = pd.read_csv(depth_file, sep="\t", names=['sequence', 'start', 'end', 'depth'])  
@@ -54,7 +65,6 @@ def plot_coverage(depth_file, winSize):
   fig, ax = plt.subplots(1,1)
   ax.bar(x=df2['position'], height=df2['depth'], width=winSize)
   ax.set_title("Coverage over final_mitogenome.fasta")
-  ax.set_ylim(top=ylim)  
 
   plt.savefig("final_mitogenome.coverage.png")
 
