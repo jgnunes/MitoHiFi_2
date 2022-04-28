@@ -28,7 +28,7 @@ import plot_coverage
 
 def main():
     
-    __version__ = '2.15.1'
+    __version__ = '2.3'
     start_time = time.time()
 
     parser = argparse.ArgumentParser(prog='MitoHiFi')
