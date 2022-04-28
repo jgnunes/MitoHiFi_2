@@ -24,11 +24,11 @@ from parallel_annotation import process_contig, process_contig_02
 import shlex
 from circularizationCheck import circularizationCheck, get_circo_mito
 import alignContigs
-
+import plot_coverage
 
 def main():
     
-    __version__ = '2.14.2'
+    __version__ = '2.15.1'
     start_time = time.time()
 
     parser = argparse.ArgumentParser(prog='MitoHiFi')
@@ -47,6 +47,7 @@ def main():
     optional.add_argument("-m", help="-m: Number of bits for HiFiasm bloom filter [it maps to -f in HiFiasm] (default = 0)", type=int, default=0, metavar='<BLOOM FILTER>')
     optional.add_argument('--circular-size', help='Size to consider when checking for circularization', type=int, default=220)
     optional.add_argument('--circular-offset', help='Offset from start and finish to consider when looking for circularization', type=int, default=40)
+    optional.add_argument('-winSize', help='Size of windows to calculate coverage over the final_mitogenom', type=int, default=300)
     optional.add_argument('-v', '--version', action='version', version='%(prog)s ' + __version__)
     optional.add_argument("-o", help="""-o: Organism genetic code following NCBI table (for mitogenome annotation):
     1. The Standard Code 2. The Vertebrate MitochondrialCode 3. The Yeast Mitochondrial Code 
@@ -364,6 +365,30 @@ The pipeline has stopped !! You need to run further scripts to check if you have
     # copying final FASTA and GBK to working directory
     shutil.copy(final_fasta, "final_mitogenome.fasta")
     shutil.copy(final_gbk, "final_mitogenome.gb")
+
+    # creating coverage plot 
+    if args.r:
+        step += 1
+        logging.info(f"{step}. Building coverage distribution for final_mitogenome.fasta")
+        
+        # mapping reads against final mito
+        minimap_cmd = ["minimap2", "-t", str(args.t), "--secondary=no", "-ax", "map-pb", "final_mitogenome.fasta"] + shlex.split(args.r) 
+        samtools_cmd = ["samtools", "view", "-@", str(args.t), "-S", "-b", "-F4", "-F", "0x800"] 
+        logging.info(f"{step}.1 Mapping HiFi reads against final_mitogenome.fasta:")
+        logging.info(" ".join(minimap_cmd) + " | " + " ".join(samtools_cmd) + " > HiFi-vs-final_mitogenome.bam")        
+        minimap = subprocess.Popen(minimap_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        mapped_reads_f = open("HiFi-vs-final_mitogenome.bam", "w")
+        subprocess.run(samtools_cmd, stderr=subprocess.STDOUT, stdin=minimap.stdout, stdout=mapped_reads_f)
+        minimap.wait()
+        minimap.stdout.close()
+        
+        # creating coverage plot
+        logging.info(f"{step}.2 Creating coverage plot...")
+        genome_filename = plot_coverage.make_genome_file("final_mitogenome.fasta") 
+        genome_windows_filename = plot_coverage.make_genome_windows(genome_filename, args.winSize)
+        windows_depth_filename = plot_coverage.get_windows_depth(genome_windows_filename, "HiFi-vs-final_mitogenome.bam")
+        plot_coverage.plot_coverage(windows_depth_filename, args.winSize)
+
 
     # cleaning up working directory 
     cleanUpCWD.clean_up_work_dir(contigs_ids)
