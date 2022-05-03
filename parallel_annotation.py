@@ -1,3 +1,4 @@
+import re
 import os
 import concurrent.futures
 import sys
@@ -7,10 +8,13 @@ import getMitoLength
 import logging
 import warnings 
 import rotation
+import shutil
 from circularizationCheck import get_circo_mito
 from getReprContig import get_circularization_info
 import findFrameShifts
 import filterfasta
+from rotate_genbank import rotate_genbank
+from reverse_complement import reverse_complement
 
 def process_contig(threads_per_contig, circular_size, circular_offset, contigs, max_contig_size, rel_gbk, gen_code, contig_id): 
     """Circularize and annotate a contig.
@@ -91,25 +95,31 @@ def process_contig_02(ref_tRNA, threads_per_contig, circular_size, circular_offs
     if start == None:
         warnings.warn(f"Reference gene {ref_tRNA} is not present in contig {contig_id}. Skipping contig...")
         return
+    
+    mitogenome_annotation = os.path.join(contig_id + ".annotation", contig_id + ".annotation_MitoFinder_mitfi_Final_Results", contig_id + ".annotation_mtDNA_contig.gb")
+    mitogenome_gb = contig_id + ".mitogenome.gb"
+    shutil.copy(mitogenome_annotation, mitogenome_gb)
 
-    mitogenome_gb = os.path.join(contig_id + ".annotation", contig_id + ".annotation_MitoFinder_mitfi_Final_Results", contig_id + ".annotation_mtDNA_contig.gb")
-
-    genome = contig_id + ".mitogenome.fa"
+    mitogenome_fasta = contig_id + ".mitogenome.fa"
     if strand == -1:
         logging.info(f"{ref_tRNA} is at reverse complement of {contig_id}.mitogenome.fa")
         logging.info(f"For that reason we'll reverse complement {contig_id}.mitogenome.fa before the rotation")
-        genome_rc = contig_id + "_RC.mitogenome.fa"
-        rc = os.path.join(os.path.dirname(genome), genome_rc)
-        rotation.make_rc(genome, rc)
-        logging.info(f"Reverse complement generated: {contig_id}_RC.mitogenome.fa. Starting reverse complement annotation...")
-        mitogenome_gb = rotation.annotate(os.path.dirname(genome), os.path.abspath(genome_rc), os.path.abspath(rel_gbk), contig_id, gen_code, max_contig_size, str(threads_per_contig))
-        logging.info(f"Annotation of reverse complement for contig {contig_id} done")
-        genome = rc
-        if not os.path.isfile(mitogenome_gb):
-            warnings.warn("Contig "+ contig_id + " does not have a reverse complemented annotation file, check MitoFinder's log")
+        #mitogenome_gb_rc = mitogenome_gb.replace("")
+        
+        #genome_rc = contig_id + "_RC.mitogenome."
+        #rc = os.path.join(os.path.dirname(genome), genome_rc)
+        #rotation.make_rc(genome, rc)
+        mitogenome_gb_rc = re.sub(r".gb$", "_RC.gb", mitogenome_gb)
+        mitogenome_fasta_rc = re.sub(r".gb$", ".fasta", mitogenome_gb_rc)
+        reverse_complement(mitogenome_gb, mitogenome_gb_rc) 
+        #logging.info(f"Reverse complement generated: . Starting reverse complement annotation...")
+        #mitogenome_gb = rotation.annotate(os.path.dirname(genome), os.path.abspath(genome_rc), os.path.abspath(rel_gbk), contig_id, gen_code, max_contig_size, str(threads_per_contig))
+        logging.info(f"Reverse complementation completed for contig {contig_id} done")
+        mitogenome_fasta = mitogenome_fasta_rc
+        mitogenome_gb = mitogenome_gb_rc
+        if not os.path.isfile(mitogenome_gb_rc):
+            warnings.warn("Contig "+ contig_id + " does not have a reverse complemented file, check log.")
             return
-
-    rotation.rotate(genome, start, contig_id)
     
     try:
         f = open(mitogenome_gb)
@@ -119,14 +129,26 @@ def process_contig_02(ref_tRNA, threads_per_contig, circular_size, circular_offs
     finally:
         f.close()
 
-    rotated_file = os.path.join(os.path.dirname(genome), contig_id + '.mitogenome.rotated.fa')
+    mitogenome_rotated_gb = f"{contig_id}.mitogenome.rotated.gb"
+    rotate_genbank(mitogenome_gb, ref_tRNA, mitogenome_rotated_gb)
+    
+    try:
+        f = open(mitogenome_rotated_gb)
+    except FileNotFoundError:
+        sys.exit(f"""Rotated file {mitogenome_rotated_gb} not found.
+        An error may have occurred during the rotation step.""")
+    finally:
+        f.close()
+
+    rotated_file = os.path.join(os.path.dirname(mitogenome_fasta), contig_id + '.mitogenome.rotated.fa')
     logging.info(f"Rotation of {contig_id} done. Rotated is at {rotated_file}") 
     # check frameshifts in genes from contig and save findings to 
     # `{contig_id}.individual.stats` intermediate file
-    frameshifts = findFrameShifts.find_frameshifts(mitogenome_gb)
-    gb_len, num_genes = findFrameShifts.get_gb_stats(mitogenome_gb)
+    logging.info(f"Started calculating mitocontig stats... {contig_id}") # debug
+    frameshifts = findFrameShifts.find_frameshifts(mitogenome_rotated_gb)
+    gb_len, num_genes = findFrameShifts.get_gb_stats(mitogenome_rotated_gb)
     contig_dir = os.path.join("potential_contigs", contig_id)
-    mitogenome_location = os.path.join(contig_dir, mitogenome_gb)
+    mitogenome_location = os.path.join(contig_dir, mitogenome_rotated_gb)
     is_circ = get_circularization_info(contig_id)
     if not frameshifts:
         all_frameshifts = "No frameshift found"
