@@ -36,9 +36,11 @@ def rotate_genbank(in_gbk, ref_gene, out_gbk):
     record = SeqIO.read(in_gbk, "genbank")
     shifted_record = record[ref_start:] + record[:ref_start]
     
-    shifted_record.id = f"{record.id}_rotated".replace("_draft", "")
-    shifted_record.name = f"{record.name}_rotated".replace("_draft", "")
+    #shifted_record.id = f"{record.id}_rotated".replace("_draft", "")
+    #shifted_record.name = f"{record.name}_rotated".replace("_draft", "")
     
+    shifted_record.id = f"{record.id}_rotated"
+    shifted_record.name = f"{record.name}_rotated"
 
     with open(out_gbk, "w") as f:
         SeqIO.write(shifted_record, f, "genbank")

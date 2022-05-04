@@ -315,23 +315,32 @@ The pipeline has stopped !! You need to run further scripts to check if you have
     repr_contig_id, repr_contig_cluster = getReprContig.get_repr_contig("all_mitogenomes.rotated.fa", rel_mito_len, args.t, args.d)
     logging.info(f"Representative contig is {repr_contig_id} that belongs to {repr_contig_cluster}. This contig will be our final mitogenome. See all contigs and clusters in cdhit.out.clstr")
     
+    # create copies for final mitogenome (repr contigs) at both 
+    # FASTA and GENBANK formats
     repr_contig_fasta = repr_contig_id + ".mitogenome.rotated.fa"
-    repr_contig_get_gb = ["mitofinder", "--new-genes", "--max-contig-size",
-                        str(max_contig_size), "-j", "final_mitogenome.annotation",
-                        "-a", repr_contig_fasta, "-r", args.g, "-o", args.o, "-p", str(args.p),
-                        "--circular-size", "8000"]
-    subprocess.run(repr_contig_get_gb, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+    repr_contig_gb = repr_contig_id + ".mitogenome.rotated.gb"
+    final_fasta = "final_mitogenome.fasta" 
+    final_gb = "final_mitogenome.gb"
 
-    final_fasta = os.path.join("final_mitogenome.annotation", "final_mitogenome.annotation_MitoFinder_mitfi_Final_Results", "final_mitogenome.annotation_mtDNA_contig.fasta")
-    final_gbk = os.path.join("final_mitogenome.annotation", "final_mitogenome.annotation_MitoFinder_mitfi_Final_Results", "final_mitogenome.annotation_mtDNA_contig.gb")
+    shutil.copy(repr_contig_fasta, final_fasta)
+    shutil.copy(repr_contig_gb, final_gb)
+    
+    #repr_contig_get_gb = ["mitofinder", "--new-genes", "--max-contig-size",
+    #                    str(max_contig_size), "-j", "final_mitogenome.annotation",
+    #                    "-a", repr_contig_fasta, "-r", args.g, "-o", args.o, "-p", str(args.p),
+    #                    "--circular-size", "8000"]
+    #subprocess.run(repr_contig_get_gb, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+
+    #final_fasta = os.path.join("final_mitogenome.annotation", "final_mitogenome.annotation_MitoFinder_mitfi_Final_Results", "final_mitogenome.annotation_mtDNA_contig.fasta")
+    #final_gbk = os.path.join("final_mitogenome.annotation", "final_mitogenome.annotation_MitoFinder_mitfi_Final_Results", "final_mitogenome.annotation_mtDNA_contig.gb")
     
     # Generate contigs stats
     step += 1
     logging.info(f"""{step}. Calculating final stats for final mitogenome and other potential contigs.
     Stats will be saved on contigs_stats.tsv file.""")
     ## Print first three lines (comment and header)
-    frameshifts = findFrameShifts.find_frameshifts(final_gbk)  
-    contig_len, num_genes = findFrameShifts.get_gb_stats(final_gbk)
+    frameshifts = findFrameShifts.find_frameshifts(final_gb)  
+    contig_len, num_genes = findFrameShifts.get_gb_stats(final_gb)
     is_circ = getReprContig.get_circularization_info(repr_contig_id)
     if not frameshifts:
         all_frameshifts = "No frameshift found"
@@ -354,17 +363,13 @@ The pipeline has stopped !! You need to run further scripts to check if you have
         if curr_file.endswith('.individual.stats'):
             # skips addition of representative contig, which is the 
             # same as the final_mitogenome
-            if curr_file.split('.')[0] != repr_contig_id: 
+            if curr_file.split('.individual.stats')[0] != repr_contig_id: 
                 contigs_stats_files.append(curr_file)
     
     with open("contigs_stats.tsv", "a") as outfile:
         for contig_stats in contigs_stats_files:
             with open(contig_stats, "r") as infile:
                 shutil.copyfileobj(infile, outfile)
-
-    # copying final FASTA and GBK to working directory
-    shutil.copy(final_fasta, "final_mitogenome.fasta")
-    shutil.copy(final_gbk, "final_mitogenome.gb")
 
     # creating coverage plot 
     if args.r:

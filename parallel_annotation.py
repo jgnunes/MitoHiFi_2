@@ -9,6 +9,7 @@ import logging
 import warnings 
 import rotation
 import shutil
+from Bio import SeqIO 
 from circularizationCheck import get_circo_mito
 from getReprContig import get_circularization_info
 import findFrameShifts
@@ -98,7 +99,14 @@ def process_contig_02(ref_tRNA, threads_per_contig, circular_size, circular_offs
     
     mitogenome_annotation = os.path.join(contig_id + ".annotation", contig_id + ".annotation_MitoFinder_mitfi_Final_Results", contig_id + ".annotation_mtDNA_contig.gb")
     mitogenome_gb = contig_id + ".mitogenome.gb"
-    shutil.copy(mitogenome_annotation, mitogenome_gb)
+    #shutil.copy(mitogenome_annotation, mitogenome_gb)
+    # create copy of annotation file without the _draft modification
+    # implemented by MitoFinder at ID and NAME sections
+    record = SeqIO.read(mitogenome_annotation, "genbank")
+    record.id = record.description
+    record.name = record.description
+    with open(mitogenome_gb, "w") as f:
+        SeqIO.write(record, f, "genbank")
 
     mitogenome_fasta = contig_id + ".mitogenome.fa"
     if strand == -1:
