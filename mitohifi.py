@@ -84,12 +84,12 @@ def main():
     if args.r:
         logging.info("Running MitoHifi pipeline in reads mode...")
         logging.info("1. First we map your Pacbio HiFi reads to the close-related mitogenome")
-        minimap_cmd = ["minimap2", "-t", str(args.t), "--secondary=no", "-ax", "map-pb", args.f] + shlex.split(args.r) 
-        samtools_cmd = ["samtools", "view", "-@", str(args.t), "-S", "-b", "-F4", "-F", "0x800"] 
-        logging.info(" ".join(minimap_cmd) + " | " + " ".join(samtools_cmd) + " > reads.HiFiMapped.bam")        
+        minimap_cmd = ["minimap2", "-t", str(args.t), "--secondary=no", "-ax", "map-hifi", args.f] + shlex.split(args.r) 
+        samtools_cmd = ["samtools", "view", "-@", str(args.t), "-b", "-F4", "-F", "0x800", "-o", "reads.HiFiMapped.bam"] 
+        logging.info(" ".join(minimap_cmd) + " | " + " ".join(samtools_cmd))        
         minimap = subprocess.Popen(minimap_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-        mapped_reads_f = open("reads.HiFiMapped.bam", "w")
-        subprocess.run(samtools_cmd, stderr=subprocess.STDOUT, stdin=minimap.stdout, stdout=mapped_reads_f)
+        #mapped_reads_f = open("reads.HiFiMapped.bam", "w")
+        subprocess.run(samtools_cmd, stderr=subprocess.STDOUT, stdin=minimap.stdout)
         minimap.wait()
         minimap.stdout.close()
         
@@ -377,13 +377,13 @@ The pipeline has stopped !! You need to run further scripts to check if you have
         logging.info(f"{step}. Building coverage distribution for final_mitogenome.fasta")
         
         # mapping reads against final mito
-        minimap_cmd = ["minimap2", "-t", str(args.t), "--secondary=no", "-ax", "map-pb", "final_mitogenome.fasta"] + shlex.split(args.r) 
-        samtools_cmd = ["samtools", "view", "-@", str(args.t), "-S", "-b", "-F4", "-F", "0x800"] 
+        minimap_cmd = ["minimap2", "-t", str(args.t), "--secondary=no", "-ax", "map-hifi", "final_mitogenome.fasta"] + shlex.split(args.r) 
+        samtools_cmd = ["samtools", "view", "-@", str(args.t), "-b", "-F4", "-F", "0x800", "-o", "HiFi-vs-final_mitogenome.bam"] 
         logging.info(f"{step}.1 Mapping HiFi reads against final_mitogenome.fasta:")
-        logging.info(" ".join(minimap_cmd) + " | " + " ".join(samtools_cmd) + " > HiFi-vs-final_mitogenome.bam")        
+        logging.info(" ".join(minimap_cmd) + " | " + " ".join(samtools_cmd))        
         minimap = subprocess.Popen(minimap_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-        mapped_reads_f = open("HiFi-vs-final_mitogenome.bam", "w")
-        subprocess.run(samtools_cmd, stderr=subprocess.STDOUT, stdin=minimap.stdout, stdout=mapped_reads_f)
+        #mapped_reads_f = open("HiFi-vs-final_mitogenome.bam", "w")
+        subprocess.run(samtools_cmd, stderr=subprocess.STDOUT, stdin=minimap.stdout)
         minimap.wait()
         minimap.stdout.close()
         
