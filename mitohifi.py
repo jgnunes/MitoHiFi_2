@@ -387,13 +387,43 @@ The pipeline has stopped !! You need to run further scripts to check if you have
         minimap.wait()
         minimap.stdout.close()
         
+        # sorting and creating index for the mapping file
+        try:
+            f = open("HiFi-vs-final_mitogenome.bam")
+        except FileNotFoundError:
+            sys.exit("""No HiFi-vs-final_mitogenome.bam file.
+            An error may have occurred when mapping reads to final_mitogenome.fasta""")
+        finally:
+            f.close()
+        
+        sort_cmd = ["samtools", "sort", "-@", str(args.t), "HiFi-vs-final_mitogenome.bam", "-o", "HiFi-vs-final_mitogenome.sorted.bam"]
+        subprocess.run(sort_cmd, stderr=subprocess.STDOUT)
+        try:
+            f = open("HiFi-vs-final_mitogenome.sorted.bam")
+        except FileNotFoundError:
+            sys.exit("""No HiFi-vs-final_mitogenome.sorted.bam file.
+            An error may have occurred when sorting the HiFi-vs-final_mitogenome.bam file""")
+        finally:
+            f.close()
+        index_cmd = ["samtools", "index", "HiFi-vs-final_mitogenome.sorted.bam"]
+        subprocess.run(index_cmd, stderr=subprocess.STDOUT)
+        try:
+            f = open("HiFi-vs-final_mitogenome.sorted.bam.bai")
+        except FileNotFoundError:
+            sys.exit("""No HiFi-vs-final_mitogenome.sorted.bam.bai file.
+            An error may have occurred when indexing the HiFi-vs-final_mitogenome.sorted.bam file""")
+        finally:
+            f.close()
+        
+
         # creating coverage plot
         logging.info(f"{step}.2 Creating coverage plot...")
         genome_filename = plot_coverage.make_genome_file("final_mitogenome.fasta") 
         genome_windows_filename = plot_coverage.make_genome_windows(genome_filename, args.winSize)
         windows_depth_filename = plot_coverage.get_windows_depth(genome_windows_filename, "HiFi-vs-final_mitogenome.bam")
         plot_coverage.plot_coverage(windows_depth_filename, args.winSize)
-        plot_coverage.move_intermediate_files(["HiFi-vs-final_mitogenome.bam", genome_filename, genome_windows_filename, windows_depth_filename])
+        plot_coverage.move_intermediate_files(["HiFi-vs-final_mitogenome.bam", "HiFi-vs-final_mitogenome.sorted.bam",
+            "HiFi-vs-final_mitogenome.sorted.bam.bai", genome_filename, genome_windows_filename, windows_depth_filename])
 
     # cleaning up working directory 
     cleanUpCWD.clean_up_work_dir(contigs_ids)
