@@ -300,12 +300,12 @@ The pipeline has stopped !! You need to run further scripts to check if you have
     concat_fasta = alignContigs.concatenate_contigs(contigs_files)
     # then run MAFFT alignment between the rotated contigs using the multifasta as input and clustal as output format
     alignContigs.mafft_align(multifasta_file=concat_fasta, threads=args.t, clustal_format=True)
-    logging.info("Alignment done and saved at ./final_mitogenome_choice/all_mitogenomes.rotated.aligned.fa\n")
+    logging.info("Alignment done and saved at ./final_mitogenome_choice/all_mitogenomes.rotated.aligned.aln\n")
 
     try:
-        f = open("all_mitogenomes.rotated.aligned.fa")
+        f = open("all_mitogenomes.rotated.aligned.aln")
     except FileNotFoundError:
-        sys.exit("""No all_mitogenomes.rotated.aligned.fa file.
+        sys.exit("""No all_mitogenomes.rotated.aligned.aln file.
         An error may have occurred when aligning the potential contigs""")
     finally:
         f.close()
