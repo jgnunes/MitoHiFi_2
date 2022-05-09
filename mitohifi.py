@@ -25,10 +25,11 @@ import shlex
 from circularizationCheck import circularizationCheck, get_circo_mito
 import alignContigs
 import plot_coverage
+import plot_annotation
 
 def main():
     
-    __version__ = '2.4'
+    __version__ = '2.3'
     start_time = time.time()
 
     parser = argparse.ArgumentParser(prog='MitoHiFi')
@@ -370,6 +371,34 @@ The pipeline has stopped !! You need to run further scripts to check if you have
         for contig_stats in contigs_stats_files:
             with open(contig_stats, "r") as infile:
                 shutil.copyfileobj(infile, outfile)
+    
+    # creating annotation plots
+    step += 1
+    logging.info(f"{step}. Building annotation plots for all contigs")
+    annotation_plots = []
+    # add final_mitogenome annotation plot as first plot
+    plot_annotation.plot_annotation("final_mitogenome.gb", "final_mitogenome.annotation.png")
+    annotation_plots.append("final_mitogenome.annotation.png")
+    # add other plots following contigs order in `contigs_stats.tsv`
+    with open("contigs_stats.tsv", "r") as f:
+        next(f) # skips first line of `contigs_stats.tsv`
+        next(f) # skips second line of `contigs_stats.tsv`
+        next(f) # skips third line of `contigs_stats.tsv`
+        for line in f:
+            contig_id = line.split()[0]
+            contig_genbank = f"{contig_id}.mitogenome.rotated.gb"
+            contig_annotation_plot = f"{contig_id}.mitogenome.rotated.annotation.png"
+            if os.path.isfile(contig_genbank):
+                    # skip repr_conti_id since it will have the annotation plot created
+                    # after the for loop, when passing `final_mitogenome.gb` as argument
+                    if contig_id != repr_contig_id:
+                        plot_annotation.plot_annotation(contig_genbank, contig_annotation_plot)
+                        annotation_plots.append(contig_annotation_plot)
+            else:
+                logging.warning(f"No {contig_genbank} for {contig_id}. Skipping annotation plot for this contig.")
+
+    ## concatenating all annotation plots into single final plot
+    plot_annotation.merge_images(annotation_plots, "contigs_annotations.png")
 
     # creating coverage plot 
     if args.r:

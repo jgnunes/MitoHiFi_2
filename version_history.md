@@ -24,5 +24,7 @@ mitohifi-v3-fromCirc_v02.12.3.py	parallelizes annotation step
 mitohifi-v3-fromCirc_v02.13.1.py	includes related mitogenome info on contigs_stats.tsv
 mitohifi-v3-fromCirc_v02.13.2.py	fixes bugs
 mitohifi-v3-fromCirc_v02.13.3.py	creates flags for plants/animal (-a animal/plant) 
-mitohifi-v3-fromCirc_v02.13.4.py	deal with cases where none contig has tRNA-Phe gene (in progress) 
-mitohifi-v3-fromCirc_v02.13.5.py	improves logging (in progress) 
+mitohifi-v3-fromCirc_v02.13.4.py	deal with cases where none contig has tRNA-Phe gene
+mitohifi-v3-fromCirc_v02.13.5.py	improves logging
+mitohifi-v2.2	changed the version numbering to match the version number we're using withing tola group
+mitohifi-v2.3|4	coverage plots for final_mitogenome; annotation plots for all contigs; update minimap call to use hifi flag 
