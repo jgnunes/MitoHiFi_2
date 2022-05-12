@@ -18,6 +18,7 @@ def get_feat_info(feat):
 
 def rotate_genbank(in_gbk, ref_gene, out_gbk):
     
+    ref_start = None
     for seq_record in SeqIO.parse(in_gbk, "genbank"):
         complete_seq_len = len(seq_record.seq)
         for feat in seq_record.features:
@@ -26,7 +27,7 @@ def rotate_genbank(in_gbk, ref_gene, out_gbk):
                 if feat_name == ref_gene:
                     ref_start = feat.location.start
     
-    if not ref_start:
+    if ref_start is None:
         print(f"Error. Reference gene {ref_gene} not found")
         sys.exit(1)
     

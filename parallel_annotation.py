@@ -96,7 +96,8 @@ def process_contig_02(ref_tRNA, threads_per_contig, circular_size, circular_offs
     if start == None:
         warnings.warn(f"Reference gene {ref_tRNA} is not present in contig {contig_id}. Skipping contig...")
         return
-    
+
+    logging.debug(f"ref_tRNA: {ref_tRNA} | start: {start} | strand: {strand}") 
     mitogenome_annotation = os.path.join(contig_id + ".annotation", contig_id + ".annotation_MitoFinder_mitfi_Final_Results", contig_id + ".annotation_mtDNA_contig.gb")
     mitogenome_gb = contig_id + ".mitogenome.gb"
     #shutil.copy(mitogenome_annotation, mitogenome_gb)
